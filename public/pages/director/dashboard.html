@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--
+    Director dashboard:
+    - Cross-branch overview and analytics.
+    - User and branch administration interface.
+    - Connected to director.js for behavior.
+  -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Director Dashboard — Karibu Groceries LTD</title>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body class="dashboard director">
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SIDEBAR -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <img src="../../images/login-logo.png" alt="Karibu Groceries Logo" class="sidebar-logo" />
+      <h2>Karibu Groceries LTD</h2>
+    </div>
+
+    <div class="user-profile">
+      <div class="user-name" id="userName">Loading...</div>
+      <span class="user-role" id="userRole">director</span>
+      <span class="user-branch">All Branches</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" data-page="overview" class="active">
+        <i class="bi bi-speedometer2"></i> Overview
+      </a>
+      <a href="#" data-page="branches">
+        <i class="bi bi-building"></i> Branch Comparison
+      </a>
+      <a href="#" data-page="users">
+        <i class="bi bi-people-fill"></i> User Management
+      </a>
+      <a href="#" data-page="branchManagement">
+        <i class="bi bi-building-add"></i> Branch Management
+      </a>
+      <a href="#" data-page="reports">
+        <i class="bi bi-file-earmark-bar-graph"></i> Reports
+      </a>
+      <a href="#" id="logoutBtn" class="logout">
+        <i class="bi bi-box-arrow-left"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- MAIN CONTENT -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div class="main-content">
+    
+    <!-- HEADER -->
+    <div class="content-header">
+      <h1>Director Dashboard</h1>
+      <div class="header-actions">
+        <div class="search-wrapper">
+          <i class="bi bi-search"></i>
+          <input type="text" id="dashboardSearch" class="search-bar" placeholder="Search across all data...">
+        </div>
+        <div class="notif-icon">
+          <i class="bi bi-bell-fill"></i>
+          <span class="badge">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAT CARDS (Company-wide) -->
+    <div class="stats-row">
+      
+      <!-- Total Sales -->
+      <div class="stat-card">
+        <div class="stat-icon sales-icon"><i class="bi bi-cash-stack"></i></div>
+        <div class="stat-info">
+          <h3>TOTAL SALES</h3>
+          <div class="stat-value" id="totalSalesValue">Ush 0</div>
+          <div class="stat-sub" id="totalSalesCount">0 TXNS</div>
+        </div>
+      </div>
+
+      <!-- Total Credits -->
+      <div class="stat-card">
+        <div class="stat-icon credit-icon"><i class="bi bi-receipt"></i></div>
+        <div class="stat-info">
+          <h3>TOTAL CREDITS</h3>
+          <div class="stat-value" id="totalCreditsValue">Ush 0</div>
+          <div class="stat-sub" id="totalCreditsCount">0 CREDITS</div>
+        </div>
+      </div>
+
+      <!-- Total Stock -->
+      <div class="stat-card">
+        <div class="stat-icon stock-icon"><i class="bi bi-box-seam"></i></div>
+        <div class="stat-info">
+          <h3>TOTAL STOCK</h3>
+          <div class="stat-value" id="totalStockValue">0 kg</div>
+          <div class="stat-sub" id="totalStockCount">0 PRODUCTS</div>
+        </div>
+      </div>
+
+      <!-- Pending Credits -->
+      <div class="stat-card">
+        <div class="stat-icon pending-icon"><i class="bi bi-hourglass-split"></i></div>
+        <div class="stat-info">
+          <h3>PENDING CREDITS</h3>
+          <div class="stat-value" id="pendingCreditsValue">Ush 0</div>
+          <div class="stat-sub">Outstanding</div>
+        </div>
+      </div>
+
+      <!-- Total Users -->
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#e0e7ff;"><i class="bi bi-people-fill" style="color:#4338ca;"></i></div>
+        <div class="stat-info">
+          <h3>ACTIVE USERS</h3>
+          <div class="stat-value" id="totalUsersValue">0</div>
+          <div class="stat-sub" id="totalUsersBreakdown">Staff</div>
+        </div>
+      </div>
+
+      <!-- Overdue Credits -->
+      <div class="stat-card">
+        <div class="stat-icon overdue-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+        <div class="stat-info">
+          <h3>OVERDUE</h3>
+          <div class="stat-value" id="overdueValue">0</div>
+          <div class="stat-sub">Past Due</div>
+        </div>
+      </div>
+
+      <!-- Low Stock Items -->
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#fef3c7;"><i class="bi bi-exclamation-circle-fill" style="color:#92400e;"></i></div>
+        <div class="stat-info">
+          <h3>LOW STOCK</h3>
+          <div class="stat-value" id="lowStockValue">0</div>
+          <div class="stat-sub">Items</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- ════════════════════════════════════════════════════════ -->
+      <!-- OVERVIEW SECTION -->
+      <!-- ════════════════════════════════════════════════════════ -->
+      <section id="overviewSection" class="content-section">
+        
+        <!-- Branch Performance Comparison -->
+        <h2 class="section-title">Branch Performance</h2>
+        <div class="branch-comparison">
+          
+          <!-- Maganjo Branch Card -->
+          <div class="branch-card">
+            <div class="branch-header">
+              <h3><i class="bi bi-building"></i> Maganjo Branch</h3>
+            </div>
+            <div class="branch-stats">
+              <div class="branch-stat">
+                <span class="stat-label">Sales</span>
+                <span class="stat-value" id="maganjoSales">Ush 0</span>
+              </div>
+              <div class="branch-stat">
+                <span class="stat-label">Stock</span>
+                <span class="stat-value" id="maganjoStock">0 kg</span>
+              </div>
+              <div class="branch-stat">
+                <span class="stat-label">Credits</span>
+                <span class="stat-value" id="maganjoCredits">Ush 0</span>
+              </div>
+              <div class="branch-stat">
+                <span class="stat-label">Staff</span>
+                <span class="stat-value" id="maganjoStaff">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Matugga Branch Card -->
+          <div class="branch-card">
+            <div class="branch-header">
+              <h3><i class="bi bi-building"></i> Matugga Branch</h3>
+            </div>
+            <div class="branch-stats">
+              <div class="branch-stat">
+                <span class="stat-label">Sales</span>
+                <span class="stat-value" id="matuggaSales">Ush 0</span>
+              </div>
+              <div class="branch-stat">
+                <span class="stat-label">Stock</span>
+                <span class="stat-value" id="matuggaStock">0 kg</span>
+              </div>
+              <div class="branch-stat">
+                <span class="stat-label">Credits</span>
+                <span class="stat-value" id="matuggaCredits">Ush 0</span>
+              </div>
+              <div class="branch-stat">
+                <span class="stat-label">Staff</span>
+                <span class="stat-value" id="matuggaStaff">0</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Recent Activity -->
+        <h2 class="section-title" style="margin-top:40px;">Sales Summary (All Branches)</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>BRANCH</th>
+                <th>TOTAL SALES (UGX)</th>
+                <th>TOTAL TONNAGE (KG)</th>
+                <th>TRANSACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="recentSalesBody">
+              <tr><td colspan="4" class="no-results">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Top Products -->
+        <h2 class="section-title" style="margin-top:40px;">Top Selling Products</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>RANK</th>
+                <th>PRODUCT</th>
+                <th>TOTAL SOLD (KG)</th>
+                <th>REVENUE (UGX)</th>
+                <th>TRANSACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="topProductsBody">
+              <tr><td colspan="5" class="no-results">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════ -->
+      <!-- BRANCH COMPARISON SECTION -->
+      <!-- ════════════════════════════════════════════════════════ -->
+      <section id="branchesSection" class="content-section" style="display:none;">
+        
+        <h2 class="section-title">Detailed Branch Comparison</h2>
+
+        <!-- Side-by-side stock comparison -->
+        <div class="comparison-grid">
+          
+          <!-- Maganjo Stock -->
+          <div class="comparison-panel">
+            <h3 class="panel-title">Maganjo — Stock</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr><th>PRODUCT</th><th>TYPE</th><th>STOCK (KG)</th></tr>
+                </thead>
+                <tbody id="maganjoStockBody">
+                  <tr><td colspan="3" class="no-results">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Matugga Stock -->
+          <div class="comparison-panel">
+            <h3 class="panel-title">Matugga — Stock</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr><th>PRODUCT</th><th>TYPE</th><th>STOCK (KG)</th></tr>
+                </thead>
+                <tbody id="matuggaStockBody">
+                  <tr><td colspan="3" class="no-results">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Credits comparison -->
+        <h2 class="section-title" style="margin-top:40px;">Outstanding Credits by Branch</h2>
+        <div class="comparison-grid">
+          
+          <!-- Maganjo Credits -->
+          <div class="comparison-panel">
+            <h3 class="panel-title">Maganjo — Credits</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr><th>METRIC</th><th>VALUE</th></tr>
+                </thead>
+                <tbody id="maganjoCreditsBody">
+                  <tr><td colspan="2" class="no-results">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Matugga Credits -->
+          <div class="comparison-panel">
+            <h3 class="panel-title">Matugga — Credits</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr><th>METRIC</th><th>VALUE</th></tr>
+                </thead>
+                <tbody id="matuggaCreditsBody">
+                  <tr><td colspan="2" class="no-results">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════ -->
+      <!-- USER MANAGEMENT SECTION -->
+      <!-- ════════════════════════════════════════════════════════ -->
+      <section id="usersSection" class="content-section" style="display:none;">
+        
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <h2 class="section-title" style="margin:0;">User Management</h2>
+          <button onclick="openAddUserModal()" class="btn-primary">
+            <i class="bi bi-person-plus-fill"></i> Add New User
+          </button>
+        </div>
+
+        <!-- Users Table -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>NAME</th>
+                <th>EMAIL</th>
+                <th>ROLE</th>
+                <th>BRANCH</th>
+                <th>STATUS</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr><td colspan="6" class="no-results">Loading users...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════ -->
+      <!-- BRANCH MANAGEMENT SECTION (NEW) -->
+      <!-- ════════════════════════════════════════════════════════ -->
+      <section id="branchManagementSection" class="content-section" style="display:none;">
+        
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <h2 class="section-title" style="margin:0;">Branch Management</h2>
+          <button onclick="openAddBranchModal()" class="btn-primary">
+            <i class="bi bi-plus-circle"></i> Add New Branch
+          </button>
+        </div>
+
+        <!-- Branches Table -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>BRANCH NAME</th>
+                <th>LOCATION</th>
+                <th>BRANCH OFFICE CONTACT</th>
+                <th>BRANCH OFFICE EMAIL</th>
+                <th>STATUS</th>
+                <th>STAFF COUNT</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="branchesTableBody">
+              <tr><td colspan="7" class="no-results">Loading branches...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════ -->
+      <!-- REPORTS SECTION -->
+      <!-- ════════════════════════════════════════════════════════ -->
+      <section id="reportsSection" class="content-section" style="display:none;">
+        
+        <h2 class="section-title">Export Reports</h2>
+        
+        <div class="reports-grid">
+          
+          <!-- Sales Report -->
+          <div class="report-card">
+            <div class="report-icon"><i class="bi bi-cash-stack"></i></div>
+            <h3>Sales Report</h3>
+            <p>All sales across both branches</p>
+            <button onclick="exportAllSales()" class="export-btn">
+              <i class="bi bi-download"></i> Export CSV
+            </button>
+          </div>
+
+          <!-- Credits Report -->
+          <div class="report-card">
+            <div class="report-icon"><i class="bi bi-receipt"></i></div>
+            <h3>Credits Report</h3>
+            <p>All credits and outstanding balances</p>
+            <button onclick="exportAllCredits()" class="export-btn">
+              <i class="bi bi-download"></i> Export CSV
+            </button>
+          </div>
+
+          <!-- Stock Report -->
+          <div class="report-card">
+            <div class="report-icon"><i class="bi bi-box-seam"></i></div>
+            <h3>Stock Report</h3>
+            <p>Current stock levels both branches</p>
+            <button onclick="exportAllStock()" class="export-btn">
+              <i class="bi bi-download"></i> Export CSV
+            </button>
+          </div>
+
+          <!-- Users Report -->
+          <div class="report-card">
+            <div class="report-icon"><i class="bi bi-people-fill"></i></div>
+            <h3>Users Report</h3>
+            <p>All staff members and roles</p>
+            <button onclick="exportUsers()" class="export-btn">
+              <i class="bi bi-download"></i> Export CSV
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Print Options -->
+        <h2 class="section-title" style="margin-top:40px;">Print Reports</h2>
+        <div class="reports-grid">
+          
+          <div class="report-card">
+            <div class="report-icon"><i class="bi bi-printer"></i></div>
+            <h3>Comprehensive Report</h3>
+            <p>Full company overview with all metrics</p>
+            <button onclick="printComprehensiveReport()" class="export-btn">
+              <i class="bi bi-printer"></i> Print Report
+            </button>
+          </div>
+
+          <div class="report-card">
+            <div class="report-icon"><i class="bi bi-graph-up"></i></div>
+            <h3>Performance Summary</h3>
+            <p>Branch performance comparison</p>
+            <button onclick="printPerformanceReport()" class="export-btn">
+              <i class="bi bi-printer"></i> Print Report
+            </button>
+          </div>
+
+        </div>
+
+      </section>
+
+    </div><!-- /content-area -->
+  </div><!-- /main-content -->
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="../../js/common.js"></script>
+  <script src="../../js/director.js"></script>
+
+</body>
+</html>
+

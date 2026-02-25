@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--
+    Manager dashboard:
+    - Branch-level operations (procurement, sales, credit).
+    - Stock and credit monitoring with alerts.
+    - Connected to manager.js for behavior.
+  -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Dashboard — Karibu Groceries LTD</title>
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  
+  <!-- Toastify -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  
+  <!-- YOUR EXISTING CSS FILE - ALL STYLES COME FROM HERE -->
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body class="dashboard manager">
+
+  <!-- ================================================================
+       SIDEBAR - MATCHES SALES DASHBOARD EXACTLY
+       ================================================================ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <img src="../../images/login-logo.png" alt="Karibu Groceries Logo" class="sidebar-logo" />
+      <h2>Karibu Groceries LTD</h2>
+    </div>
+
+    <!-- User info - filled by manager.js -->
+    <div class="user-profile">
+      <div class="user-name" id="userName">Loading...</div>
+      <span class="user-role" id="userRole">manager</span>
+      <span class="user-branch" id="userBranch">Branch</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="sidebar-nav">
+      <a href="#" data-page="dashboard" class="active">
+        <i class="bi bi-grid-fill"></i> Dashboard
+      </a>
+      <a href="#" data-page="procurement">
+        <i class="bi bi-box-seam-fill"></i> Record Procurement
+      </a>
+      <a href="#" data-page="record-sale">
+        <i class="bi bi-cart-plus-fill"></i> Record Sale
+      </a>
+      <a href="#" data-page="record-credit">
+        <i class="bi bi-credit-card-fill"></i> Record Credit
+      </a>
+      <a href="#" data-page="credits">
+        <i class="bi bi-credit-card-2-front-fill"></i> Manage Credits
+      </a>
+      <a href="#" id="logoutBtn" class="logout">
+        <i class="bi bi-box-arrow-left"></i> Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ================================================================
+       MAIN CONTENT
+       ================================================================ -->
+  <div class="main-content">
+    
+    <!-- HEADER -->
+    <div class="content-header">
+      <h1>Manager Dashboard</h1>
+      <div class="header-actions">
+        <div class="search-wrapper">
+          <i class="bi bi-search"></i>
+          <input type="text" id="dashboardSearch" class="search-bar" placeholder="Search products, buyers, credits...">
+        </div>
+        <div class="notif-icon">
+          <i class="bi bi-bell-fill"></i>
+          <span class="badge">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="stats-row">
+      <!-- Today's Sales -->
+      <div class="stat-card">
+        <div class="stat-icon sales-icon"><i class="bi bi-cash-stack"></i></div>
+        <div class="stat-info">
+          <h3>TODAY'S SALES</h3>
+          <div class="stat-value" id="todaySalesValue">Ush 0</div>
+          <div class="stat-sub" id="todaySalesCount">0 TXNS</div>
+        </div>
+      </div>
+
+      <!-- Today's Credits -->
+      <div class="stat-card">
+        <div class="stat-icon credit-icon"><i class="bi bi-receipt"></i></div>
+        <div class="stat-info">
+          <h3>TODAY'S CREDITS</h3>
+          <div class="stat-value" id="todayCreditsValue">Ush 0</div>
+          <div class="stat-sub" id="todayCreditsCount">0 CREDITS</div>
+        </div>
+      </div>
+
+      <!-- Available Stock -->
+      <div class="stat-card">
+        <div class="stat-icon stock-icon"><i class="bi bi-box-seam"></i></div>
+        <div class="stat-info">
+          <h3>AVAILABLE STOCK</h3>
+          <div class="stat-value" id="availableStockValue">0 kg</div>
+          <div class="stat-sub" id="availableStockCount">0 PRODUCTS</div>
+        </div>
+      </div>
+
+      <!-- Total Pending -->
+      <div class="stat-card pending-card">
+        <div class="stat-icon pending-icon"><i class="bi bi-hourglass-split"></i></div>
+        <div class="stat-info">
+          <h3>TOTAL PENDING</h3>
+          <div class="stat-value" id="totalPendingValue">Ush 0</div>
+          <div class="stat-sub">Credits</div>
+        </div>
+      </div>
+
+      <!-- Credit Count -->
+      <div class="stat-card count-card">
+        <div class="stat-icon count-icon"><i class="bi bi-receipt"></i></div>
+        <div class="stat-info">
+          <h3>CREDIT COUNT</h3>
+          <div class="stat-value" id="pendingCountValue">0</div>
+          <div class="stat-sub">Total</div>
+        </div>
+      </div>
+
+      <!-- Overdue -->
+      <div class="stat-card overdue-card">
+        <div class="stat-icon overdue-icon"><i class="bi bi-clock-history"></i></div>
+        <div class="stat-info">
+          <h3>OVERDUE</h3>
+          <div class="stat-value" id="overdueValue">0</div>
+          <div class="stat-sub">Past due</div>
+        </div>
+      </div>
+
+      <!-- Today's Tonnage -->
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#ede9fe;"><i class="bi bi-boxes" style="color:#7c3aed;"></i></div>
+        <div class="stat-info">
+          <h3>TODAY'S TONNAGE</h3>
+          <div class="stat-value" id="todayTonnageValue">0 kg</div>
+          <div class="stat-sub" id="todayTonnageCount">0 DISPATCHES</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- DASHBOARD SECTION -->
+      <section id="dashboardSection" class="content-section">
+        
+        <!-- Stock Table Title with Print Button -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <h2 class="section-title" style="margin:0;">
+            Available Stock — <span id="stockBranch">Matugga</span> Branch
+          </h2>
+          <button onclick="printStockReport()" 
+            style="padding:7px 14px;background:#0f2c6b;color:white;border:none;
+                   border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+            <i class="bi bi-printer"></i> Print Stock
+          </button>
+        </div>
+        
+        <!-- Stock Table with 4 columns -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>PRODUCT</th>
+                <th>AVAILABLE (KG)</th>
+                <th>SELL PRICE (UGX/KG)</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody">
+              <tr><td colspan="4" class="no-results">Loading stock data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Recent Credits Table with Print Button -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:15px;">
+          <h2 class="section-title" style="margin:0;">Recent Credits</h2>
+          <button onclick="printCreditsReport()" 
+            style="padding:7px 14px;background:#0f2c6b;color:white;border:none;
+                   border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;">
+            <i class="bi bi-printer"></i> Print Credits
+          </button>
+        </div>
+        
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>PRODUCT & BUYER</th>
+                <th>TONNAGE (KG)</th>
+                <th>AMOUNT DUE</th>
+                <th>DUE DATE</th>
+                <th>STATUS</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="creditsTableBody">
+              <tr><td colspan="6" class="no-results">No credit sales recorded</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Recent Sales Table with Export Button -->
+        <div class="section-header-with-button">
+          <h2 class="section-title">Recent Sales</h2>
+          <button class="export-btn" onclick="exportSalesCSV()">
+            <i class="bi bi-download"></i> Export CSV
+          </button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>PRODUCE</th>
+                <th>TONNAGE (KG)</th>
+                <th>AMOUNT (UGX)</th>
+                <th>BUYER</th>
+                <th>DATE / TIME</th>
+              </tr>
+            </thead>
+            <tbody id="salesTableBody">
+              <tr><td colspan="5" class="no-results">No recent sales</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           PROCUREMENT FORM - 2-COLUMN GRID LIKE SALES PAGE
+           ============================================================ -->
+      <section id="procurementSection" class="content-section" style="display:none;">
+        <div class="form-card">
+          <div class="form-header">
+            <i class="bi bi-box-seam-fill"></i>
+            <h2>Record Procurement</h2>
+            <span class="format-hint">All fields marked * are required</span>
+          </div>
+
+          <div class="form-body">
+            <form id="procurementForm">
+              <!-- 2-COLUMN GRID - SAME AS SALES FORM -->
+              <div class="form-grid-2">
+
+                <!-- Product Name -->
+                <div class="form-group">
+                  <label for="procurementName">
+                    Product Name <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="procurementName"
+                    required
+                    minlength="2"
+                    placeholder="e.g. Beans, Maize"
+                  />
+                </div>
+
+                <!-- Type -->
+                <div class="form-group">
+                  <label for="procurementType">
+                    Type <span class="required">*</span>
+                  </label>
+                  <select id="procurementType" required>
+                    <option value="">Select Type</option>
+                  </select>
+                </div>
+
+                <!-- Tonnage -->
+                <div class="form-group">
+                  <label for="procurementTonnage">
+                    Tonnage (kg) <span class="required">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="procurementTonnage"
+                    required
+                    min="1000"
+                    step="100"
+                    placeholder="e.g. 5000"
+                  />
+                  <small class="field-hint">Minimum: 1,000 kg</small>
+                </div>
+
+                <!-- Total Cost -->
+                <div class="form-group">
+                  <label for="procurementCost">
+                    Total Cost (UGX) <span class="required">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="procurementCost"
+                    required
+                    min="10000"
+                    step="1000"
+                    placeholder="e.g. 2000000"
+                  />
+                </div>
+
+                <!-- Price to Sell -->
+                <div class="form-group">
+                  <label for="procurementPrice">
+                    Price to Sell (UGX/kg) <span class="required">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="procurementPrice"
+                    required
+                    min="1000"
+                    step="100"
+                    placeholder="e.g. 3000"
+                  />
+                </div>
+
+                <!-- Dealer Name -->
+                <div class="form-group">
+                  <label for="procurementDealer">
+                    Dealer Name <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="procurementDealer"
+                    required
+                    minlength="2"
+                    placeholder="e.g. John Supplier"
+                  />
+                </div>
+
+                <!-- Dealer Contact -->
+                <div class="form-group">
+                  <label for="procurementContact">
+                    Dealer Contact <span class="required">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    id="procurementContact"
+                    required
+                    pattern="0[1-9]\d{8}"
+                    placeholder="0771234567"
+                  />
+                  <small class="field-hint">Format: 07XXXXXXXX or 03XXXXXXXX</small>
+                </div>
+
+                <!-- Date -->
+                <div class="form-group">
+                  <label for="procurementDate">
+                    Date <span class="required">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    id="procurementDate"
+                    required
+                    readonly
+                  />
+                </div>
+
+                <!-- Time -->
+                <div class="form-group">
+                  <label for="procurementTime">
+                    Time <span class="required">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    id="procurementTime"
+                    required
+                    readonly
+                  />
+                </div>
+
+                <!-- Empty spacer to maintain 2-column grid -->
+                <div class="form-group"></div>
+
+              </div><!-- /form-grid-2 -->
+
+              <!-- FORM ACTIONS -->
+              <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="showSection('dashboard')">
+                  <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                <button type="submit" class="btn-submit">
+                  <i class="bi bi-check-lg"></i> Record Procurement
+                </button>
+              </div>
+            </form>
+          </div><!-- /form-body -->
+        </div><!-- /form-card -->
+      </section><!-- /procurementSection -->
+
+      <!-- MANAGER SALE SECTION -->
+      <section id="record-saleSection" class="content-section" style="display:none;">
+        <div class="form-card">
+          <div class="form-header">
+            <h2>Record Sale</h2>
+            <span class="format-hint">All fields marked * are required</span>
+          </div>
+          <div class="form-body">
+            <form id="saleForm">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="saleProduce">Produce Name <span class="required">*</span></label>
+                  <select id="saleProduce" required>
+                    <option value="">Select produce</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="saleType">Type <span class="required">*</span></label>
+                  <select id="saleType" class="produce-type-select" required>
+                    <option value="">Select type</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="saleTonnage">Tonnage (kg) <span class="required">*</span></label>
+                  <input type="number" id="saleTonnage" min="1000" step="0.1" placeholder="Min 1,000 kg" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="saleAmount">Amount Paid (UGX) <span class="required">*</span></label>
+                  <input type="number" id="saleAmount" min="10000" step="1000" placeholder="Auto-calculated from tonnage" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="saleBuyer">Buyer's Name <span class="required">*</span></label>
+                  <input type="text" id="saleBuyer" minlength="2" placeholder="Enter buyer's full name" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="saleContact">Contact (Optional)</label>
+                  <input type="text" id="saleContact" placeholder="0772123456" />
+                </div>
+
+                <div class="form-group">
+                  <label for="saleAgent">Manager</label>
+                  <input type="text" id="saleAgent" disabled />
+                </div>
+
+                <div class="form-group">
+                  <label for="saleDate">Date</label>
+                  <input type="date" id="saleDate" disabled />
+                </div>
+
+                <div class="form-group">
+                  <label for="saleTime">Time</label>
+                  <input type="time" id="saleTime" disabled />
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="showSection('dashboard')">
+                  <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                <button type="submit" class="btn-submit">
+                  <i class="bi bi-check-lg"></i> Record Sale
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- MANAGER CREDIT SECTION -->
+      <section id="record-creditSection" class="content-section" style="display:none;">
+        <div class="form-card">
+          <div class="form-header">
+            <h2>Record Credit Sale</h2>
+            <span class="format-hint">All fields marked * are required</span>
+          </div>
+          <div class="form-body">
+            <form id="creditForm">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="creditProduce">Produce Name <span class="required">*</span></label>
+                  <select id="creditProduce" required>
+                    <option value="">Select produce</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="creditType">Type <span class="required">*</span></label>
+                  <select id="creditType" class="produce-type-select" required>
+                    <option value="">Select type</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="creditTonnage">Tonnage (kg) <span class="required">*</span></label>
+                  <input type="number" id="creditTonnage" min="1000" step="0.1" placeholder="Min 1,000 kg" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="creditAmount">Amount Due (UGX) <span class="required">*</span></label>
+                  <input type="number" id="creditAmount" min="10000" step="1000" placeholder="Auto-calculated from tonnage" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="creditDispatchDate">Date of Dispatch</label>
+                  <input type="date" id="creditDispatchDate" disabled />
+                </div>
+
+                <div class="form-group">
+                  <label for="creditDue">Payment Due Date <span class="required">*</span></label>
+                  <input type="date" id="creditDue" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="creditBuyer">Buyer's Name <span class="required">*</span></label>
+                  <input type="text" id="creditBuyer" minlength="2" placeholder="Enter buyer's full name" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="creditNin">National ID (NIN) <span class="required">*</span></label>
+                  <input type="text" id="creditNin" maxlength="16" placeholder="CM12345678ABCDE" required />
+                  <small class="field-hint">14-16 uppercase letters and numbers</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="creditLocation">Location <span class="required">*</span></label>
+                  <input type="text" id="creditLocation" minlength="2" placeholder="Village, town, or district" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="creditContact">Phone Contact <span class="required">*</span></label>
+                  <input type="tel" id="creditContact" placeholder="0772123456" required />
+                  <small class="field-hint">10 digits starting with 0</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="creditAgent">Manager</label>
+                  <input type="text" id="creditAgent" disabled />
+                </div>
+
+                <div class="form-group"></div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="showSection('dashboard')">
+                  <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                <button type="submit" class="btn-submit">
+                  <i class="bi bi-check-lg"></i> Record Credit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- CREDITS SECTION -->
+      <section id="creditsSection" class="content-section" style="display:none;">
+        <h2 class="section-title">Manage Credits</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Product & Buyer</th>
+                <th>Tonnage</th>
+                <th>Amount Due</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="creditsTableBodyFull"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div><!-- /content-area -->
+  </div><!-- /main-content -->
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="../../js/common.js"></script>
+  <script src="../../js/manager.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,607 @@
+<!-- ==================================================================
+   SALES AGENT DASHBOARD - KARIBU GROCERIES LTD
+   ==================================================================
+   FILE: public/pages/sales/dashboard.html
+
+   CREDIT FORM FIELD ORDER (logical filling sequence):
+   Row 1: Produce Name        | Type of Produce
+   Row 2: Tonnage (kg)        | Amount Due (auto-calculated)
+   Row 3: Due Date            | Date of Dispatch (auto)
+   Row 4: Buyer's Name        | National ID
+   Row 5: Location            | Contacts
+   Row 6: Sales Agent (auto)  | [empty / spacer]
+   ================================================================== -->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sales Dashboard | Karibu Groceries LTD</title>
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Toastify -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="../../css/style.css" />
+  </head>
+
+  <body class="dashboard">
+
+    <!-- ================================================================
+         SIDEBAR
+         ================================================================ -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img
+          src="../../images/login-logo.png"
+          alt="Karibu Groceries Logo"
+          class="sidebar-logo"
+        />
+        <h2>Karibu Groceries LTD</h2>
+      </div>
+
+      <!-- Logged-in user info — filled by sales.js on load -->
+      <div class="user-profile">
+        <div class="user-name" id="userName">Loading...</div>
+        <span class="user-role" id="userRole">sales agent</span>
+        <span class="user-branch" id="userBranch">-</span>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <a href="#" class="active" data-page="dashboard">
+          <i class="bi bi-house-door"></i> Dashboard
+        </a>
+        <a href="#" data-page="record-sale">
+          <i class="bi bi-cart-plus"></i> Record Sale
+        </a>
+        <a href="#" data-page="record-credit">
+          <i class="bi bi-credit-card"></i> Record Credit
+        </a>
+        <a href="#" id="logoutBtn" class="logout">
+          <i class="bi bi-box-arrow-left"></i> Logout
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ================================================================
+         MAIN CONTENT
+         ================================================================ -->
+    <main class="main-content">
+
+      <!-- STICKY HEADER -->
+      <header class="content-header">
+        <h1 id="pageTitle">Sales Dashboard</h1>
+        <div class="header-actions">
+          <!-- Search bar — filters stock table in real-time -->
+          <div class="search-wrapper">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              id="tableSearch"
+              placeholder="Search by name, type, quantity..."
+              class="search-bar"
+              aria-label="Search stock"
+            />
+          </div>
+          <!-- Notification bell — badge shows low/out-of-stock count -->
+          <button class="notif-icon" aria-label="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge">0</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- STATS CARDS ROW -->
+      <div class="stats-row">
+
+        <!-- Today's Cash Sales -->
+        <div class="stat-card">
+          <div class="stat-icon sales-icon">
+            <i class="bi bi-cart-check"></i>
+          </div>
+          <div class="stat-info">
+            <h3>TODAY'S SALES</h3>
+            <div class="stat-value" id="todaySalesValue">Ush 0</div>
+            <div class="stat-sub"  id="todaySalesCount">0 TXNS</div>
+          </div>
+        </div>
+
+        <!-- Today's Credit Sales -->
+        <div class="stat-card">
+          <div class="stat-icon credit-icon">
+            <i class="bi bi-credit-card"></i>
+          </div>
+          <div class="stat-info">
+            <h3>TODAY'S CREDITS</h3>
+            <div class="stat-value" id="todayCreditsValue">Ush 0</div>
+            <div class="stat-sub"  id="todayCreditsCount">0 TXNS</div>
+          </div>
+        </div>
+
+        <!-- Available Stock -->
+        <div class="stat-card">
+          <div class="stat-icon stock-icon">
+            <i class="bi bi-box"></i>
+          </div>
+          <div class="stat-info">
+            <h3>AVAILABLE STOCK</h3>
+            <div class="stat-value" id="availableStockValue">0 kg</div>
+            <div class="stat-sub"  id="availableStockCount">0 PRODUCTS</div>
+          </div>
+        </div>
+
+        <!-- Total Credit Pending -->
+        <div class="stat-card pending-card">
+          <div class="stat-icon pending-icon">
+            <i class="bi bi-exclamation-triangle"></i>
+          </div>
+          <div class="stat-info">
+            <h3>TOTAL PENDING</h3>
+            <div class="stat-value" id="totalPendingValue">Ush 0</div>
+            <div class="stat-sub">All credit sales</div>
+          </div>
+        </div>
+
+        <!-- Credit Sales Count -->
+        <div class="stat-card count-card">
+          <div class="stat-icon count-icon">
+            <i class="bi bi-receipt"></i>
+          </div>
+          <div class="stat-info">
+            <h3>CREDIT SALES</h3>
+            <div class="stat-value" id="pendingCountValue">0</div>
+            <div class="stat-sub">Total transactions</div>
+          </div>
+        </div>
+
+        <!-- Overdue Credits -->
+        <div class="stat-card overdue-card">
+          <div class="stat-icon overdue-icon">
+            <i class="bi bi-clock-history"></i>
+          </div>
+          <div class="stat-info">
+            <h3>OVERDUE</h3>
+            <div class="stat-value" id="overdueValue">0</div>
+            <div class="stat-sub">Past due date</div>
+          </div>
+        </div>
+
+        <!-- Today's Total Tonnage Dispatched -->
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#ede9fe;">
+            <i class="bi bi-boxes" style="color:#7c3aed;"></i>
+          </div>
+          <div class="stat-info">
+            <h3>TODAY'S TONNAGE</h3>
+            <div class="stat-value" id="todayTonnageValue">0 kg</div>
+            <div class="stat-sub" id="todayTonnageCount">0 DISPATCHES</div>
+          </div>
+        </div>
+
+      </div><!-- /stats-row -->
+
+      <!-- ============================================================
+           SCROLLABLE CONTENT AREA
+           Sections are toggled by showSection() in sales.js
+           ============================================================ -->
+      <div class="content-area">
+
+        <!-- ============================================================
+             SECTION: DASHBOARD (default view)
+             ============================================================ -->
+        <div id="dashboardSection" class="content-section">
+
+          <!-- Available Stock Table -->
+          <h2 class="section-title">
+            Available Stock — <span id="stockBranch">Branch</span> Branch
+          </h2>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>PRODUCE NAME</th>
+                  <th>TONNAGE (KG)</th>
+                  <th>PRICE (UGX/kg)</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="stockTableBody">
+                <tr>
+                  <td colspan="4" class="no-results">Loading stock data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Recent Credit Sales Table -->
+          <h2 class="section-title" style="margin-top:40px;">
+            Recent Credit Sales
+          </h2>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>PRODUCE / BUYER</th>
+                  <th>TONNAGE (KG)</th>
+                  <th>AMOUNT DUE</th>
+                  <th>DUE DATE</th>
+                  <th>STATUS</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="recentCreditsBody">
+                <tr>
+                  <td colspan="6" class="no-results">No credit sales recorded</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Recent Cash Sales Table -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:15px;">
+            <h2 class="section-title" style="margin:0;border:none;padding:0;">
+              Recent Sales
+            </h2>
+            <button onclick="exportSalesCSV()"
+              style="display:flex;align-items:center;gap:6px;padding:7px 14px;
+                     background:#1a2744;color:white;border:none;border-radius:8px;
+                     font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.2s;"
+              onmouseover="this.style.background='#1e3a5f'"
+              onmouseout="this.style.background='#1a2744'">
+              <i class="bi bi-download"></i> Export CSV
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>PRODUCE</th>
+                  <th>TONNAGE (KG)</th>
+                  <th>AMOUNT (UGX)</th>
+                  <th>BUYER</th>
+                  <th>DATE / TIME</th>
+                </tr>
+              </thead>
+              <tbody id="recentSalesBody">
+                <tr>
+                  <td colspan="5" class="no-results">No recent sales</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div><!-- /dashboardSection -->
+
+        <!-- ============================================================
+             SECTION: RECORD SALE
+             ============================================================ -->
+        <div id="record-saleSection" class="content-section" style="display:none;">
+          <div class="form-card">
+            <div class="form-header">
+              <h2>Record Sale</h2>
+              <span class="format-hint">All fields marked * are required</span>
+            </div>
+            <div class="form-body">
+              <form id="saleForm">
+                <div class="form-grid-2">
+
+                  <!-- ROW 1: What is being sold -->
+                  <!-- Produce Name (dropdown populated from live stock) -->
+                  <div class="form-group">
+                    <label for="saleProduce">
+                      Produce Name <span class="required">*</span>
+                    </label>
+                    <select id="saleProduce" required>
+                      <option value="">Select produce</option>
+                    </select>
+                  </div>
+
+                  <!-- Type (populated from PRODUCE_TYPES constant in JS) -->
+                  <div class="form-group">
+                    <label for="saleType">
+                      Type <span class="required">*</span>
+                    </label>
+                    <select id="saleType" class="produce-type-select" required>
+                      <option value="">Select type</option>
+                    </select>
+                  </div>
+
+                  <!-- ROW 2: How much and how much it costs -->
+                  <!-- Tonnage — triggers auto-calculation of amount -->
+                  <div class="form-group">
+                    <label for="saleTonnage">
+                      Tonnage (kg) <span class="required">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="saleTonnage"
+                      min="1000"
+                      step="0.1"
+                      placeholder="Min 1,000 kg"
+                      required
+                    />
+                  </div>
+
+                  <!-- Amount Paid — auto-filled by price calculator, editable -->
+                  <div class="form-group">
+                    <label for="saleAmount">
+                      Amount Paid (UGX) <span class="required">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="saleAmount"
+                      min="10000"
+                      step="1000"
+                      placeholder="Auto-calculated from tonnage"
+                      required
+                    />
+                  </div>
+
+                  <!-- ROW 3: Buyer info -->
+                  <!-- Buyer's Name -->
+                  <div class="form-group">
+                    <label for="saleBuyer">
+                      Buyer's Name <span class="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="saleBuyer"
+                      minlength="2"
+                      placeholder="Enter buyer's full name"
+                      required
+                    />
+                  </div>
+
+                  <!-- Contact (optional) -->
+                  <div class="form-group">
+                    <label for="saleContact">Contact (Optional)</label>
+                    <input
+                      type="text"
+                      id="saleContact"
+                      placeholder="0772123456"
+                    />
+                  </div>
+
+                  <!-- ROW 4: Auto-filled fields -->
+                  <!-- Sales Agent — auto-filled from logged-in user, read-only -->
+                  <div class="form-group">
+                    <label for="saleAgent">Sales Agent</label>
+                    <input type="text" id="saleAgent" disabled />
+                  </div>
+
+                  <!-- Date — auto-filled, read-only -->
+                  <div class="form-group">
+                    <label for="saleDate">Date</label>
+                    <input type="date" id="saleDate" disabled />
+                  </div>
+
+                  <!-- Time — auto-filled, read-only -->
+                  <div class="form-group">
+                    <label for="saleTime">Time</label>
+                    <input type="time" id="saleTime" disabled />
+                  </div>
+
+                </div><!-- /form-grid-2 -->
+
+                <div class="form-actions">
+                  <button type="button" class="btn-cancel" onclick="showSection('dashboard')">
+                    <i class="bi bi-x-lg"></i> Cancel
+                  </button>
+                  <button type="submit" class="btn-submit">
+                    <i class="bi bi-check-lg"></i> Record Sale
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div><!-- /record-saleSection -->
+
+        <!-- ============================================================
+             SECTION: RECORD CREDIT
+             FIELD ORDER (logical filling sequence):
+               1. What is being dispatched (produce + type)
+               2. How much quantity and what is owed (tonnage + amount)
+               3. When it was dispatched and when payment is due
+               4. Who the buyer is (name + national ID)
+               5. Where and how to reach them (location + contact)
+               6. Auto-filled agent info
+             ============================================================ -->
+        <div id="record-creditSection" class="content-section" style="display:none;">
+          <div class="form-card">
+            <div class="form-header">
+              <h2>Record Credit Sale</h2>
+              <span class="format-hint">For trusted buyers — all fields marked * are required</span>
+            </div>
+            <div class="form-body">
+              <form id="creditForm">
+                <div class="form-grid-2">
+
+                  <!-- ── ROW 1: What produce is being dispatched ────────── -->
+
+                  <!-- Produce Name — dropdown from live stock, triggers price calc -->
+                  <div class="form-group">
+                    <label for="creditProduce">
+                      Produce Name <span class="required">*</span>
+                    </label>
+                    <select id="creditProduce" required>
+                      <option value="">Select produce</option>
+                    </select>
+                  </div>
+
+                  <!-- Type of Produce -->
+                  <div class="form-group">
+                    <label for="creditType">
+                      Type of Produce <span class="required">*</span>
+                    </label>
+                    <select id="creditType" class="produce-type-select" required>
+                      <option value="">Select type</option>
+                    </select>
+                  </div>
+
+                  <!-- ── ROW 2: Quantity and money ────────────────────────── -->
+
+                  <!-- Tonnage — triggers auto-calculation of Amount Due -->
+                  <div class="form-group">
+                    <label for="creditTonnage">
+                      Tonnage (kg) <span class="required">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="creditTonnage"
+                      min="1000"
+                      step="0.1"
+                      placeholder="Min 1,000 kg"
+                      required
+                    />
+                  </div>
+
+                  <!-- Amount Due — auto-filled by calculateCreditAmount(), editable -->
+                  <div class="form-group">
+                    <label for="creditAmount">
+                      Amount Due (UGX) <span class="required">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      id="creditAmount"
+                      min="10000"
+                      step="1000"
+                      placeholder="Auto-calculated from tonnage"
+                      required
+                    />
+                  </div>
+
+                  <!-- ── ROW 3: Dates ──────────────────────────────────────── -->
+
+                  <!-- Date of Dispatch — auto-filled (today), read-only -->
+                  <div class="form-group">
+                    <label for="creditDispatchDate">Date of Dispatch</label>
+                    <input type="date" id="creditDispatchDate" disabled />
+                  </div>
+
+                  <!-- Due Date — agent sets when payment is expected -->
+                  <div class="form-group">
+                    <label for="creditDue">
+                      Payment Due Date <span class="required">*</span>
+                    </label>
+                    <input type="date" id="creditDue" required />
+                  </div>
+
+                  <!-- ── ROW 4: Buyer identity ─────────────────────────────── -->
+
+                  <!-- Buyer's Full Name -->
+                  <div class="form-group">
+                    <label for="creditBuyer">
+                      Buyer's Name <span class="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="creditBuyer"
+                      minlength="2"
+                      placeholder="Enter buyer's full name"
+                      required
+                    />
+                  </div>
+
+                  <!-- National ID (NIN) — auto-uppercased as user types -->
+                  <div class="form-group">
+                    <label for="creditNin">
+                      National ID (NIN) <span class="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="creditNin"
+                      maxlength="16"
+                      placeholder="CM12345678ABCDE"
+                      required
+                    />
+                    <!-- Removed HTML5 pattern attribute — validation is done in JS
+                         with auto-uppercase so the agent never fails on case.
+                         JS in sales.js handles the /^[A-Z0-9]{14,16}$/ check. -->
+                    <small class="field-hint">
+                      14–16 characters, letters and numbers (e.g., CM12345678ABCDE)
+                    </small>
+                  </div>
+
+                  <!-- ── ROW 5: Buyer contact info ──────────────────────────── -->
+
+                  <!-- Location / Address -->
+                  <div class="form-group">
+                    <label for="creditLocation">
+                      Location <span class="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="creditLocation"
+                      minlength="2"
+                      placeholder="Village, town, or district"
+                      required
+                    />
+                  </div>
+
+                  <!-- Phone Contact -->
+                  <div class="form-group">
+                    <label for="creditContact">
+                      Phone Contact <span class="required">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      id="creditContact"
+                      pattern="^0\d{9}$"
+                      placeholder="0772123456"
+                      required
+                    />
+                    <small class="field-hint">
+                      10 digits starting with 0 (e.g., 0772123456)
+                    </small>
+                  </div>
+
+                  <!-- ── ROW 6: Auto-filled info ─────────────────────────────── -->
+
+                  <!-- Sales Agent — auto-filled from logged-in user, read-only -->
+                  <div class="form-group">
+                    <label for="creditAgent">Sales Agent</label>
+                    <input type="text" id="creditAgent" disabled />
+                  </div>
+
+                  <!-- Spacer to keep grid balanced — intentionally empty -->
+                  <div class="form-group"></div>
+
+                </div><!-- /form-grid-2 -->
+
+                <div class="form-actions">
+                  <button type="button" class="btn-cancel" onclick="showSection('dashboard')">
+                    <i class="bi bi-x-lg"></i> Cancel
+                  </button>
+                  <button type="submit" class="btn-submit">
+                    <i class="bi bi-check-lg"></i> Record Credit
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div><!-- /record-creditSection -->
+
+      </div><!-- /content-area -->
+    </main><!-- /main-content -->
+
+    <!-- ================================================================
+         SCRIPTS
+         Load order matters: Toastify → common helpers → sales logic
+         ================================================================ -->
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="../../js/common.js"></script>
+    <script src="../../js/sales.js"></script>
+
+  </body>
+</html>
