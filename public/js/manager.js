@@ -1883,6 +1883,7 @@ window.printStockReport = function() {
   const printWindow = window.open('', '_blank', 'width=1000,height=800');
   printWindow.document.write(printHTML);
   printWindow.document.close();
+  showToast('Stock report opened for printing', 'success');
 };
 
 /**
@@ -2029,4 +2030,5 @@ window.printCreditsReport = function() {
   const printWindow = window.open('', '_blank', 'width=1200,height=800');
   printWindow.document.write(printHTML);
   printWindow.document.close();
+  showToast('Credits report opened for printing', 'success');
 };

@@ -700,6 +700,7 @@ body.dashboard .main-content {
   height: 100vh;
   overflow: hidden;
   background: var(--bg-light);
+  transition: margin-left 0.3s ease;
 }
 
 /* Sticky Header */
@@ -715,6 +716,77 @@ body.dashboard .content-header {
   z-index: 100;
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
   height: 70px;
+}
+
+body.dashboard .header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Sidebar toggle button:
+   Uses brand colors for strong contrast on the white header and
+   visual consistency with the sidebar gradient theme. */
+body.dashboard .sidebar-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(15, 44, 107, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-medium) 100%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(15, 44, 107, 0.22);
+}
+
+body.dashboard .sidebar-toggle-btn i {
+  font-size: 1.2rem;
+}
+
+body.dashboard .sidebar-toggle-btn:hover {
+  background: linear-gradient(135deg, #0c255b 0%, #0e84a0 100%);
+  border-color: rgba(15, 44, 107, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 44, 107, 0.3);
+}
+
+body.dashboard .sidebar-toggle-btn:focus-visible {
+  outline: 3px solid rgba(10, 161, 177, 0.35);
+  outline-offset: 2px;
+}
+
+body.dashboard .sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  z-index: 900;
+}
+
+body.dashboard .sidebar-backdrop.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+body.dashboard .sidebar {
+  transition: left 0.3s ease, transform 0.3s ease;
+}
+
+body.dashboard.sidebar-collapsed .sidebar {
+  transform: translateX(calc(-1 * var(--sidebar-width)));
+}
+
+body.dashboard.sidebar-collapsed .main-content {
+  margin-left: 0;
 }
 
 body.dashboard .content-header h1 {
@@ -1079,24 +1151,25 @@ body.dashboard .price-value {
 
 /* Action Buttons in Tables */
 body.dashboard .action-btn {
-  background: var(--blue-bright);
+  background: linear-gradient(135deg, #0f2c6b 0%, #126de4 100%);
   color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
+  border: 1px solid rgba(15, 44, 107, 0.22);
+  padding: 7px 13px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 600;
   transition: all 0.2s;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  box-shadow: 0 3px 8px rgba(15, 44, 107, 0.18);
 }
 
 body.dashboard .action-btn:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #0c255b 0%, #0f5ec7 100%);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 6px 12px rgba(15, 44, 107, 0.24);
 }
 
 body.dashboard .action-btn i {
@@ -1173,19 +1246,22 @@ body.dashboard .no-results {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
-  background: #1a2744;
+  padding: 8px 15px;
+  background: linear-gradient(135deg, #0f2c6b 0%, #126de4 100%);
   color: white;
-  border: none;
+  border: 1px solid rgba(15, 44, 107, 0.22);
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 3px 10px rgba(15, 44, 107, 0.2);
 }
 
 .export-btn:hover {
-  background: #1e3a5f;
+  background: linear-gradient(135deg, #0c255b 0%, #0f5ec7 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 44, 107, 0.26);
 }
 
 /* ======================================================================
@@ -1289,33 +1365,34 @@ body.dashboard .form-actions {
 }
 
 body.dashboard .btn-primary {
-  background: var(--blue-bright);
+  background: linear-gradient(135deg, #0f2c6b 0%, #126de4 100%);
   color: white;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 6px;
-  font-weight: 500;
+  border: 1px solid rgba(15, 44, 107, 0.2);
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   transition: all 0.2s;
   font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(15, 44, 107, 0.2);
 }
 
 body.dashboard .btn-primary:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #0c255b 0%, #0f5ec7 100%);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 6px 14px rgba(15, 44, 107, 0.26);
 }
 
 body.dashboard .btn-cancel {
-  background: #e2e8f0;
-  color: var(--text-dark);
-  border: none;
-  padding: 8px 20px;
-  border-radius: 6px;
-  font-weight: 500;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1325,7 +1402,9 @@ body.dashboard .btn-cancel {
 }
 
 body.dashboard .btn-cancel:hover {
-  background: #cbd5e1;
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
 }
 
 /* Table action buttons (Director branch/user management) */
@@ -1339,18 +1418,20 @@ body.dashboard .table-actions {
 
 body.dashboard .table-action-btn {
   border: none;
-  border-radius: 6px;
-  padding: 5px 10px;
+  border-radius: 7px;
+  padding: 6px 11px;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   color: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
 
 body.dashboard .table-action-btn:hover {
   transform: translateY(-1px);
-  opacity: 0.95;
+  opacity: 0.96;
+  box-shadow: 0 5px 11px rgba(15, 23, 42, 0.26);
 }
 
 body.dashboard .action-edit {
@@ -1514,12 +1595,12 @@ body.dashboard .user-form-error {
   }
 }
 
-/* Submit buttons on forms (Record Sale / Record Credit)
-   Uses violet to match the screenshot's button colour */
+/* Submit buttons on forms:
+   Uses brand-aligned navy/teal gradient for stronger visual identity. */
 body.dashboard .btn-submit {
-  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #0f2c6b 0%, #0aa1b1 100%);
   color: white;
-  border: none;
+  border: 1px solid rgba(15, 44, 107, 0.24);
   padding: 10px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -1529,13 +1610,45 @@ body.dashboard .btn-submit {
   gap: 8px;
   transition: all 0.2s;
   font-size: 0.9rem;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 3px 10px rgba(15, 44, 107, 0.24);
 }
 
 body.dashboard .btn-submit:hover {
-  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, #0c255b 0%, #088998 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+  box-shadow: 0 6px 14px rgba(15, 44, 107, 0.28);
+}
+
+/* Shared button interaction feedback for keyboard and active states. */
+body.dashboard .btn-primary:focus-visible,
+body.dashboard .btn-submit:focus-visible,
+body.dashboard .btn-cancel:focus-visible,
+body.dashboard .action-btn:focus-visible,
+body.dashboard .table-action-btn:focus-visible,
+body.dashboard .export-btn:focus-visible {
+  outline: 3px solid rgba(10, 161, 177, 0.32);
+  outline-offset: 2px;
+}
+
+body.dashboard .btn-primary:active,
+body.dashboard .btn-submit:active,
+body.dashboard .btn-cancel:active,
+body.dashboard .action-btn:active,
+body.dashboard .table-action-btn:active,
+body.dashboard .export-btn:active {
+  transform: translateY(0);
+}
+
+body.dashboard .btn-primary:disabled,
+body.dashboard .btn-submit:disabled,
+body.dashboard .btn-cancel:disabled,
+body.dashboard .action-btn:disabled,
+body.dashboard .table-action-btn:disabled,
+body.dashboard .export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 /* Field hints (e.g. NIN format, phone format) */
@@ -1990,7 +2103,7 @@ body.dashboard .badge {
   /* Sidebar becomes hidden by default */
   body.dashboard .sidebar {
     left: -280px;
-    transition: left 0.3s;
+    transform: none;
   }
   
   body.dashboard .sidebar.open {
@@ -2018,11 +2131,21 @@ body.dashboard .badge {
   
   /* Header stacks vertically */
   body.dashboard .content-header {
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
     height: auto;
     padding: 15px 20px;
+  }
+
+  body.dashboard .header-left {
+    width: 100%;
+  }
+
+  body.dashboard .header-left h1 {
+    font-size: 1.2rem;
   }
   
   body.dashboard .header-actions {
@@ -2527,9 +2650,9 @@ body.dashboard.director .report-card p {
 }
 
 body.dashboard.director .export-btn {
-  background: var(--purple-bright);
+  background: linear-gradient(135deg, #0f2c6b 0%, #126de4 100%);
   color: white;
-  border: none;
+  border: 1px solid rgba(15, 44, 107, 0.22);
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
@@ -2538,12 +2661,14 @@ body.dashboard.director .export-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: background 0.2s, transform 0.2s;
+  transition: all 0.2s;
+  box-shadow: 0 3px 10px rgba(15, 44, 107, 0.2);
 }
 
 body.dashboard.director .export-btn:hover {
-  background: #0891a3;
+  background: linear-gradient(135deg, #0c255b 0%, #0f5ec7 100%);
   transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 44, 107, 0.26);
 }
 
 /* Responsive Design for Director Dashboard */
