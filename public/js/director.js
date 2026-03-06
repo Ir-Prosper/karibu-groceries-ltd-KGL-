@@ -14,7 +14,7 @@ const token=()=>localStorage.getItem('token')||null;
 const nB=(v)=>String(v||'').trim().toLowerCase();
 const money=(n)=>`Ush ${(Number(n)||0).toLocaleString()}`;
 function t(msg,type='success'){if(typeof showToast==='function')showToast(msg,type);else console.log(msg)}
-async function api(url,opt={}){const h={...(opt.headers||{})};const tk=token();if(tk&&!h.Authorization&&!h.authorization)h.Authorization=`Bearer ${tk}`;const r=await fetch(url,{...opt,headers:h});if(!r.ok){let m=`${r.status} ${r.statusText}`;try{const b=await r.json();if(b?.error)m+=`: ${b.error}`}catch(_){}throw new Error(m)}if(r.status===204)return null;return r.json()}
+async function api(url,opt={}){const h={...(opt.headers||{})};const tk=token();if(tk&&!h.Authorization&&!h.authorization)h.Authorization=`Bearer ${tk}`;const r=await fetch(url,{...opt,headers:h});if(r.status===401){localStorage.removeItem('token');localStorage.removeItem('user');window.location.href='../../index.html?reason=session_expired';throw new Error('Session expired')}if(!r.ok){let m=`${r.status} ${r.statusText}`;try{const b=await r.json();if(b?.error)m+=`: ${b.error}`}catch(_){}throw new Error(m)}if(r.status===204)return null;return r.json()}
 function branchNames(){const a=allBranches.map(b=>String(b?.name||'').trim()).filter(Boolean);if(a.length)return a;const u=[...new Set(allUsers.map(x=>String(x?.branch||'').trim()).filter(Boolean))];return u.length?u:['Maganjo','Matugga']}
 function defaultBranchMeta(name){const k=nB(name);if(k==='maganjo')return{contact:'0771234567',email:'maganjo@karibugroceries.com'};if(k==='matugga')return{contact:'0772345678',email:'matugga@karibugroceries.com'};return{contact:'',email:''}}
 function slots(){const b=branchNames();return [b[0]||'Maganjo',b[1]||'Matugga']}

@@ -6,7 +6,17 @@
  * - Toast and logout helpers.
  */
 
-const API_BASE = `${window.location.origin}/api`;
+const API_BASE = (() => {
+  const { protocol, hostname, port, origin } = window.location;
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+  // Support local frontend served via Live Server (e.g., :5500) with backend on :5000.
+  if (isLocalHost && port === '5500') {
+    return `${protocol}//${hostname}:5000/api`;
+  }
+
+  return `${origin}/api`;
+})();
 
 function getToken() {
   return localStorage.getItem('token');
@@ -20,13 +30,20 @@ function checkAuth() {
 }
 
 function showToast(message, type = 'success') {
+  if (typeof Toastify !== 'function') {
+    console.warn(`[Toast fallback] ${message}`);
+    return;
+  }
+
   Toastify({
     text: message,
     duration: 3000,
     close: true,
     gravity: 'top',
     position: 'center',
-    backgroundColor: type === 'success' ? '#10b981' : '#ef4444'
+    style: {
+      background: type === 'success' ? '#10b981' : '#ef4444'
+    }
   }).showToast();
 }
 
