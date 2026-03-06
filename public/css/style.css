@@ -2159,6 +2159,26 @@ body.dashboard .badge {
   body.dashboard .search-bar {
     width: 100%;
   }
+
+  /* Mobile sidebar must scroll end-to-end so logout is always reachable. */
+  body.dashboard.manager .sidebar,
+  body.dashboard.director .sidebar,
+  body.dashboard.sales .sidebar {
+    overflow-y: auto;
+  }
+
+  body.dashboard.manager .sidebar-nav,
+  body.dashboard.director .sidebar-nav,
+  body.dashboard.sales .sidebar-nav {
+    overflow-y: auto;
+    padding-bottom: 18px;
+  }
+
+  body.dashboard.manager .sidebar-nav a.logout,
+  body.dashboard.director .sidebar-nav a.logout,
+  body.dashboard.sales .sidebar-nav a.logout {
+    margin-top: 16px;
+  }
 }
 
 /* ======================================================================

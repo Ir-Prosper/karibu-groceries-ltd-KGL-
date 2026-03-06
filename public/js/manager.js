@@ -196,6 +196,33 @@ function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers });
 }
 
+function normalizeStockItems(items) {
+  const map = new Map();
+  for (const item of (items || [])) {
+    const name = String(item?.name || '').trim();
+    const type = String(item?.type || '').trim();
+    const price = Number(item?.price_to_sell || 0);
+    const remaining = Number(item?.remaining_kg || 0);
+    const key = `${name.toLowerCase()}|${type.toLowerCase()}|${price}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        _id: item?._id,
+        name,
+        type,
+        price_to_sell: price,
+        remaining_kg: remaining
+      });
+      continue;
+    }
+
+    const current = map.get(key);
+    current.remaining_kg += remaining;
+  }
+
+  return Array.from(map.values());
+}
+
 /**
  * Safely sets textContent of an element by ID.
  * @param {string} id - Element ID
@@ -303,7 +330,8 @@ async function loadAvailableStock(silent = false) {
   try {
     const res = await apiFetch(`${API_BASE}/procurement/available?branch=${user.branch}`);
     if (res.ok) {
-      availableStock = await res.json();
+      const rawStock = await res.json();
+      availableStock = normalizeStockItems(rawStock);
       console.log(`[MANAGER] Loaded ${availableStock.length} stock items`);
       displayStockTable(availableStock);
       populateSaleProduceDropdown(availableStock);
@@ -1660,6 +1688,11 @@ function stopStockPolling() {
  * @param {string} type - 'success', 'error', 'warning', or 'info'
  */
 function showToast(message, type = 'success') {
+  if (typeof Toastify !== 'function') {
+    console.warn(`[Toast fallback] ${message}`);
+    return;
+  }
+
   const colors = { 
     success: '#10b981', 
     error: '#ef4444', 
@@ -1718,8 +1751,11 @@ window.confirmLogout = () => {
   stopStockPolling();
   localStorage.removeItem('token');
   localStorage.removeItem('user');
-  showToast('Logged out successfully', 'success');
-  setTimeout(() => window.location.href = '../../index.html', 1500);
+  try {
+    showToast('Logged out successfully', 'success');
+  } finally {
+    setTimeout(() => window.location.href = '../../index.html', 900);
+  }
 };
 
 // ======================================================================
