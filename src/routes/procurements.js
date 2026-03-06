@@ -151,16 +151,35 @@ router.get('/available', verifyToken, allowRoles('director', 'manager', 'sales_a
     }
 
     const rawDocs = await Procurement.find(branchMatchQuery('branch', branch));
-    const items = rawDocs.map((doc) => ({
-      _id: doc._id,
-      name: doc.name,
-      type: doc.type,
-      price_to_sell: doc.price_to_sell,
-      remaining_kg:
+    const grouped = new Map();
+
+    for (const doc of rawDocs) {
+      const name = String(doc.name || '').trim();
+      const type = String(doc.type || '').trim();
+      const price = Number(doc.price_to_sell || 0);
+      const remaining =
         doc.remaining_kg !== undefined && doc.remaining_kg !== null
-          ? doc.remaining_kg
-          : doc.tonnage_kg
-    }));
+          ? Number(doc.remaining_kg)
+          : Number(doc.tonnage_kg || 0);
+
+      const key = `${name.toLowerCase()}|${type.toLowerCase()}|${price}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          _id: doc._id,
+          name,
+          type,
+          price_to_sell: price,
+          remaining_kg: Math.max(0, remaining)
+        });
+        continue;
+      }
+
+      grouped.get(key).remaining_kg += Math.max(0, remaining);
+    }
+
+    const items = Array.from(grouped.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
 
     return res.json(items);
   } catch (err) {

@@ -29,6 +29,56 @@ function branchMatchQuery(field, rawBranch) {
   return { [field]: { $in: patterns } };
 }
 
+async function deductStockAcrossProcurements({ produceName, branch, tonnage }) {
+  const produceRegex = new RegExp(`^${escapeRegex(produceName)}$`, 'i');
+  const lots = await Procurement.find({
+    name: { $regex: produceRegex },
+    branch
+  }).sort({ createdAt: 1 });
+
+  if (lots.length === 0) {
+    return { error: `No procurement found for "${produceName}" at ${branch} branch`, status: 404 };
+  }
+
+  const totalAvailable = lots.reduce((sum, lot) => {
+    const available = lot.remaining_kg !== undefined ? lot.remaining_kg : lot.tonnage_kg;
+    return sum + Number(available || 0);
+  }, 0);
+
+  if (totalAvailable < tonnage) {
+    return {
+      error: `Insufficient stock. Only ${totalAvailable} kg available for ${produceName}`,
+      status: 400
+    };
+  }
+
+  let toDeduct = tonnage;
+  for (const lot of lots) {
+    if (toDeduct <= 0) break;
+    const available = Number(lot.remaining_kg !== undefined ? lot.remaining_kg : lot.tonnage_kg);
+    if (available <= 0) continue;
+
+    const take = Math.min(available, toDeduct);
+    const updated = await Procurement.findOneAndUpdate(
+      { _id: lot._id, remaining_kg: { $gte: take } },
+      { $inc: { remaining_kg: -take } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return { error: 'Stock changed during sale, please retry', status: 409 };
+    }
+
+    toDeduct -= take;
+  }
+
+  if (toDeduct > 0) {
+    return { error: 'Stock changed during sale, please retry', status: 409 };
+  }
+
+  return { remainingAfter: totalAvailable - tonnage, status: 200 };
+}
+
 // POST /api/sales
 // Records a cash sale and deducts stock atomically.
 router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), async (req, res) => {
@@ -58,38 +108,13 @@ router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), asy
       return res.status(400).json({ error: 'buyer_name must be at least 2 characters' });
     }
 
-    const produceRegex = new RegExp(`^${escapeRegex(produceName)}$`, 'i');
-
-    // Atomic guarded deduction. If stock is insufficient, update will not happen.
-    const updatedProcurement = await Procurement.findOneAndUpdate(
-      {
-        name: { $regex: produceRegex },
-        branch,
-        remaining_kg: { $gte: tonnage }
-      },
-      { $inc: { remaining_kg: -tonnage } },
-      { new: true }
-    );
-
-    if (!updatedProcurement) {
-      const procurement = await Procurement.findOne({
-        name: { $regex: produceRegex },
-        branch
-      });
-
-      if (!procurement) {
-        return res.status(404).json({
-          error: `No procurement found for "${produceName}" at ${branch} branch`
-        });
-      }
-
-      const availableQty = procurement.remaining_kg !== undefined
-        ? procurement.remaining_kg
-        : procurement.tonnage_kg;
-
-      return res.status(400).json({
-        error: `Insufficient stock. Only ${availableQty} kg available for ${produceName}`
-      });
+    const stockResult = await deductStockAcrossProcurements({
+      produceName,
+      branch,
+      tonnage
+    });
+    if (stockResult.error) {
+      return res.status(stockResult.status).json({ error: stockResult.error });
     }
 
     const sale = new Sale({
@@ -107,7 +132,7 @@ router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), asy
 
     res.status(201).json({
       ...sale.toObject(),
-      stock_remaining: updatedProcurement.remaining_kg
+      stock_remaining: stockResult.remainingAfter
     });
   } catch (err) {
     console.error('[SALES POST ERROR]', err.message);
