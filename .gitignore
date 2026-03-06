@@ -30,5 +30,5 @@ pids/
 Thumbs.db
 
 # Editor folders
-.vscode/
+.vscode/*
 .idea/
