@@ -6,7 +6,7 @@
  * - Toast and logout helpers.
  */
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = `${window.location.origin}/api`;
 
 function getToken() {
   return localStorage.getItem('token');
