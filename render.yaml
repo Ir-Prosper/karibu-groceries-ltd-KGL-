@@ -13,6 +13,12 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: INIT_DIRECTOR_NAME
+        sync: false
+      - key: INIT_DIRECTOR_EMAIL
+        sync: false
+      - key: INIT_DIRECTOR_PASSWORD
+        sync: false
       - key: CORS_ORIGIN
         sync: false
       - key: RATE_LIMIT_MAX
