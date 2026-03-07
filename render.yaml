@@ -23,3 +23,9 @@ services:
         sync: false
       - key: RATE_LIMIT_MAX
         value: "300"
+      - key: LOGIN_RATE_LIMIT_MAX
+        value: "10"
+  - type: static
+    name: karibu-groceries-ltd-frontend
+    buildCommand: ""
+    staticPublishPath: public

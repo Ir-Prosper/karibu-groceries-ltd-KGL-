@@ -7,6 +7,11 @@
  */
 
 const API_BASE = (() => {
+  const overrideBase = String(window.__KGL_API_BASE__ || '').trim().replace(/\/+$/, '');
+  if (overrideBase) {
+    return overrideBase.endsWith('/api') ? overrideBase : `${overrideBase}/api`;
+  }
+
   const { protocol, hostname, port, origin } = window.location;
   const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
 
