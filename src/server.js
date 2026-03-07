@@ -21,10 +21,30 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const LOG_HTTP = process.env.LOG_HTTP === 'true';
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 300);
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = (process.env.CORS_ORIGIN || process.env.RENDER_EXTERNAL_URL || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const REQUIRED_ENV_VARS = ['MONGO_URI', 'JWT_SECRET'];
+
+function validateEnvironment() {
+  const missing = REQUIRED_ENV_VARS.filter((key) => !String(process.env[key] || '').trim());
+  if (missing.length) {
+    throw new Error(`Missing required environment variable(s): ${missing.join(', ')}`);
+  }
+
+  const jwtSecret = String(process.env.JWT_SECRET || '');
+  if (isProduction && jwtSecret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters long');
+  }
+
+  if (isProduction && allowedOrigins.length === 0) {
+    throw new Error('CORS_ORIGIN (or RENDER_EXTERNAL_URL) must be set in production');
+  }
+}
+
+validateEnvironment();
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -43,16 +63,24 @@ app.use(
     }
   })
 );
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    }
-  })
-);
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+
+  // Allow non-browser requests (health checks, server-to-server calls).
+  if (!origin) {
+    return callback(null, { origin: true });
+  }
+
+  if (!isProduction && allowedOrigins.length === 0) {
+    return callback(null, { origin: true });
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return callback(null, { origin: true });
+  }
+
+  return callback(null, { origin: false });
+}));
 app.use(express.json());
 app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,

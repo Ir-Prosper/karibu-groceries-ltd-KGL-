@@ -18,16 +18,25 @@
 <body class="login-page">
   <main class="login-shell">
     <section class="login-card" aria-labelledby="loginTitle">
-      <div class="login-card-top">
+      <div class="login-brand-panel" aria-hidden="true">
+        <div class="brand-logos-row">
+          <img src="images/logo4.png" alt="Karibu Groceries logo" class="brand-login-logo" />
+          <img src="images/login5.png" alt="Karibu Groceries warehouse logo" class="brand-side-logo" />
+        </div>
         <h1 class="brand-wordmark" aria-label="Karibu Groceries Limited">
           <span class="word-karibu">KARIBU</span>
           <span class="word-groceries">GROCERIES</span>
           <span class="word-limited">LIMITED</span>
         </h1>
-        <p class="brand-welcome">Welcome Back</p>
+        <p class="brand-welcome">Welcome back, sign in to continue your work.</p>
+        <ul class="brand-points">
+          <li><i class="bi bi-shield-check"></i> Secure internal access</li>
+          <li><i class="bi bi-graph-up-arrow"></i> Real-time branch reporting</li>
+          <li><i class="bi bi-people"></i> Built for managers and sales agents</li>
+        </ul>
       </div>
 
-      <div class="login-form-container">
+      <div class="login-form-container login-panel">
         <h2 class="form-title" id="loginTitle">Sign In</h2>
         <p class="form-subtitle">Use your account credentials to continue.</p>
         <p id="loginStatus" class="login-status" aria-live="polite"></p>
@@ -65,10 +74,11 @@
           <button type="submit" class="btn-primary" id="loginSubmitBtn">Sign In</button>
         </form>
 
-        <p class="login-footer">© 2026 Karibu Groceries LTD. All rights reserved.</p>
+        <p class="login-footer">Secure access for authorized staff only.</p>
       </div>
     </section>
   </main>
+  <footer class="page-login-footer">&copy; 2026 Karibu Groceries LTD. All rights reserved.</footer>
 
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
   <script src="js/common.js"></script>
