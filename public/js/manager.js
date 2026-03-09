@@ -33,9 +33,9 @@ if (typeof LOW_STOCK_THRESHOLD === 'undefined') {
   var LOW_STOCK_THRESHOLD = 1000; 
 }
 
-// Background poll interval: 60 seconds (matches sales agent)
+// Background poll interval: shared across dashboards (default 30 seconds)
 if (typeof STOCK_POLL_INTERVAL_MS === 'undefined') { 
-  var STOCK_POLL_INTERVAL_MS = 60000; 
+  var STOCK_POLL_INTERVAL_MS = Number(window.KGL_DASHBOARD_POLL_MS || 30000);
 }
 
 // ======================================================================
@@ -165,6 +165,8 @@ function setCurrentDateTime() {
     const el = document.getElementById(id);
     if (el) el.value = time;
   });
+  const dueEl = document.getElementById('creditDue');
+  if (dueEl) dueEl.min = date;
 }
 
 /**
@@ -1387,6 +1389,11 @@ async function submitCredit(e) {
     showToast('Please select a payment due date', 'error');
     return;
   }
+  const today = new Date().toISOString().split('T')[0];
+  if (dueDate < today) {
+    showToast('You cannot select a due date before today', 'error');
+    return;
+  }
   if (!buyerName || buyerName.length < 2) {
     showToast('Buyer name must be at least 2 characters', 'error');
     return;
@@ -1639,7 +1646,7 @@ function showStockAlertToast(low, out) {
 // ======================================================================
 // SECTION 15: BACKGROUND POLLING
 // ======================================================================
-// Syncs with backend every 60 seconds to reflect changes made by agents.
+// Syncs with backend on a shared interval to reflect changes made by agents.
 
 /**
  * Starts background polling for stock updates.
@@ -1649,6 +1656,10 @@ function startStockPolling() {
   
   stockPollInterval = setInterval(async () => {
     console.log('[POLL] Silent refresh...');
+    if (!isDashboardSectionVisible()) {
+      await refreshNotificationsOnly();
+      return;
+    }
     await loadAvailableStock(true); // silent mode
     await loadBranchSales();
     await loadCreditSales();
@@ -1666,6 +1677,22 @@ function stopStockPolling() {
     clearInterval(stockPollInterval);
     stockPollInterval = null;
     console.log('[POLLING] Stopped');
+  }
+}
+
+function isDashboardSectionVisible() {
+  const dashboardSection = document.getElementById('dashboardSection');
+  return Boolean(dashboardSection) && dashboardSection.style.display !== 'none';
+}
+
+async function refreshNotificationsOnly() {
+  try {
+    const res = await apiFetch(`${API_BASE}/procurement/available?branch=${user.branch}`);
+    if (!res.ok) return;
+    availableStock = await res.json();
+    checkLowStockAndNotify();
+  } catch (err) {
+    console.warn('[POLL] Notification-only refresh failed:', err.message);
   }
 }
 

@@ -23,6 +23,11 @@ const API_BASE = (() => {
   return `${origin}/api`;
 })();
 
+// Shared dashboard polling interval (30s) for sales, manager, and director.
+if (typeof window.KGL_DASHBOARD_POLL_MS === 'undefined') {
+  window.KGL_DASHBOARD_POLL_MS = 30000;
+}
+
 function getToken() {
   return localStorage.getItem('token');
 }

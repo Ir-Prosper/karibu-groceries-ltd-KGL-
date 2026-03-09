@@ -6,7 +6,7 @@
  */
 
 const LOW=1000;
-const NOTIF_POLL_MS=30000;
+const NOTIF_POLL_MS=Number(window.KGL_DASHBOARD_POLL_MS||30000);
 let user=null,allSales=[],allCredits=[],allStock=[],allUsers=[],allBranches=[];
 let notifPollTimer=null;
 const g=(id)=>document.getElementById(id);

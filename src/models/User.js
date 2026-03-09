@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
+  },
+  read_only: {
+    type: Boolean,
+    default: false
   }
 });
 

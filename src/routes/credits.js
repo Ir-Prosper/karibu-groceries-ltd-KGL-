@@ -8,7 +8,7 @@
 const express = require('express');
 const CreditSale = require('../models/CreditSale');
 const Procurement = require('../models/Procurement');
-const { verifyToken, allowRoles } = require('../middleware/auth');
+const { verifyToken, allowRoles, blockReadOnly } = require('../middleware/auth');
 
 const router = express.Router();
 const UNSAFE_HTML_PATTERN = /[<>`]/;
@@ -111,7 +111,7 @@ async function deductStockAcrossProcurements({ produceName, branch, tonnage, exp
 
 // POST /api/credits
 // Creates a credit sale and deducts stock atomically.
-router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), async (req, res) => {
+router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), blockReadOnly, async (req, res) => {
   try {
     const {
       produce_name,
@@ -133,7 +133,8 @@ router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), asy
     const buyerContact = String(buyer_contact || '').trim();
     const buyerLocation = String(location || '').trim();
     const produceType = String(produce_type || '').trim();
-    const dueDate = new Date(due_date);
+    const dueDateRaw = String(due_date || '').trim();
+    const dueDate = new Date(`${dueDateRaw}T00:00:00`);
 
     if (!produceName || !branch || Number.isNaN(tonnage)) {
       return res.status(400).json({
@@ -149,8 +150,13 @@ router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), asy
       return res.status(400).json({ error: 'amount_due_ugx must be a number >= 10000' });
     }
 
-    if (Number.isNaN(dueDate.getTime())) {
+    if (!dueDateRaw || Number.isNaN(dueDate.getTime())) {
       return res.status(400).json({ error: 'due_date must be a valid date' });
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (dueDate < today) {
+      return res.status(400).json({ error: 'due_date cannot be before today' });
     }
 
     if (!buyerName || buyerName.length < 2) {
@@ -231,7 +237,7 @@ router.get('/branch', verifyToken, allowRoles('director', 'manager', 'sales_agen
 });
 
 // PATCH /api/credits/:id/pay
-router.patch('/:id/pay', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), async (req, res) => {
+router.patch('/:id/pay', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), blockReadOnly, async (req, res) => {
   try {
     const { amount_ugx, note } = req.body;
     const amount = Number(amount_ugx);

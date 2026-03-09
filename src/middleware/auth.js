@@ -19,7 +19,8 @@ function verifyToken(req, res, next) {
     req.user = {
       id: payload.id,
       role: payload.role,
-      branch: payload.branch || null
+      branch: payload.branch || null,
+      read_only: Boolean(payload.read_only)
     };
     return next();
   } catch (err) {
@@ -37,7 +38,15 @@ function allowRoles(...roles) {
   };
 }
 
+function blockReadOnly(req, res, next) {
+  if (req.user?.read_only) {
+    return res.status(403).json({ error: 'Read-only account: actions are disabled' });
+  }
+  return next();
+}
+
 module.exports = {
   verifyToken,
-  allowRoles
+  allowRoles,
+  blockReadOnly
 };

@@ -10,7 +10,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Procurement = require('../models/Procurement');
 const ProcurementHistory = require('../models/ProcurementHistory');
-const { verifyToken, allowRoles } = require('../middleware/auth');
+const { verifyToken, allowRoles, blockReadOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -69,7 +69,7 @@ function normalizeProduceType(value) {
 })();
 
 // POST /api/procurement
-router.post('/', verifyToken, allowRoles('manager'), async (req, res) => {
+router.post('/', verifyToken, allowRoles('manager'), blockReadOnly, async (req, res) => {
   try {
     const branch = req.user.branch;
     if (!branch) {
@@ -299,7 +299,7 @@ router.get('/history/:id', verifyToken, allowRoles('director', 'manager', 'sales
 });
 
 // PATCH /api/procurement/:id/restock
-router.patch('/:id/restock', verifyToken, allowRoles('manager'), async (req, res) => {
+router.patch('/:id/restock', verifyToken, allowRoles('manager'), blockReadOnly, async (req, res) => {
   try {
     const { tonnage_kg, cost_ugx, dealer_name, dealer_contact, price_to_sell } = req.body;
 

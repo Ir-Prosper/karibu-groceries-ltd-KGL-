@@ -9,7 +9,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
-const { verifyToken, allowRoles } = require('../middleware/auth');
+const { verifyToken, allowRoles, blockReadOnly } = require('../middleware/auth');
 
 const router = express.Router();
 const UNSAFE_HTML_PATTERN = /[<>`]/;
@@ -28,7 +28,7 @@ router.get('/', verifyToken, allowRoles('director'), async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, allowRoles('director'), async (req, res) => {
+router.post('/', verifyToken, allowRoles('director'), blockReadOnly, async (req, res) => {
   try {
     const { full_name, email, password, role, branch } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -96,7 +96,7 @@ router.post('/', verifyToken, allowRoles('director'), async (req, res) => {
   }
 });
 
-router.patch('/:id', verifyToken, allowRoles('director'), async (req, res) => {
+router.patch('/:id', verifyToken, allowRoles('director'), blockReadOnly, async (req, res) => {
   try {
     const { full_name, email, role, branch, phone, status } = req.body;
     const normalizedRole = role === undefined
@@ -165,7 +165,7 @@ router.patch('/:id', verifyToken, allowRoles('director'), async (req, res) => {
   }
 });
 
-router.delete('/:id', verifyToken, allowRoles('director'), async (req, res) => {
+router.delete('/:id', verifyToken, allowRoles('director'), blockReadOnly, async (req, res) => {
   try {
     const existing = await User.findById(req.params.id).select('role full_name');
     if (!existing) {

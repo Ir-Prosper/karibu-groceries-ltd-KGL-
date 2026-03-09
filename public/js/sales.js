@@ -29,8 +29,10 @@ if (typeof PRODUCE_TYPES === 'undefined') {
 // Use window namespace so this is safe even if common.js declares it too
 if (typeof LOW_STOCK_THRESHOLD === 'undefined') { var LOW_STOCK_THRESHOLD = 1000; }
 
-// Background poll interval: every 60 seconds
-if (typeof STOCK_POLL_INTERVAL_MS === 'undefined') { var STOCK_POLL_INTERVAL_MS = 60000; }
+// Background poll interval: shared across dashboards (default 30 seconds)
+if (typeof STOCK_POLL_INTERVAL_MS === 'undefined') {
+  var STOCK_POLL_INTERVAL_MS = Number(window.KGL_DASHBOARD_POLL_MS || 30000);
+}
 
 // ======================================================================
 // SECTION 2: INITIALIZATION
@@ -107,6 +109,8 @@ function setCurrentDateTime() {
   });
   const timeEl = document.getElementById('saleTime');
   if (timeEl) timeEl.value = time;
+  const dueEl = document.getElementById('creditDue');
+  if (dueEl) dueEl.min = today;
 }
 
 /** Populates all produce-type dropdowns from the PRODUCE_TYPES constant. */
@@ -168,7 +172,7 @@ function setupNinAutoUppercase() {
 // ======================================================================
 
 /**
- * Every 60 seconds, silently re-fetches stock and credits from the API.
+ * Silently re-fetches stock, sales, and credits from the API.
  * If the manager restocked or marked a credit as paid, the agent's
  * dashboard picks it up without any page reload.
  */
@@ -177,7 +181,12 @@ function startStockPolling() {
 
   stockPollInterval = setInterval(async () => {
     console.log('[POLL] Silent stock refresh...');
+    if (!isDashboardSectionVisible()) {
+      await refreshNotificationsOnly();
+      return;
+    }
     await loadAvailableStock(true);
+    await loadRecentSales();
     await loadCreditSales(true);
     await loadDashboardStats();
   }, STOCK_POLL_INTERVAL_MS);
@@ -190,6 +199,22 @@ function stopStockPolling() {
     clearInterval(stockPollInterval);
     stockPollInterval = null;
     console.log('[POLL] Polling stopped');
+  }
+}
+
+function isDashboardSectionVisible() {
+  const dashboardSection = document.getElementById('dashboardSection');
+  return Boolean(dashboardSection) && dashboardSection.style.display !== 'none';
+}
+
+async function refreshNotificationsOnly() {
+  try {
+    const res = await apiFetch(`${API_BASE}/procurement/available?branch=${user.branch}`);
+    if (!res.ok) return;
+    availableStock = await res.json();
+    checkLowStockAndNotify();
+  } catch (err) {
+    console.warn('[POLL] Notification-only refresh failed:', err.message);
   }
 }
 
@@ -980,6 +1005,11 @@ async function submitCredit(e) {
   // ── Due date ───────────────────────────────────────────────────────────
   const dueDate = document.getElementById('creditDue')?.value;
   if (!dueDate) { showToast('Please select a payment due date', 'error'); return; }
+  const today = new Date().toISOString().split('T')[0];
+  if (dueDate < today) {
+    showToast('You cannot select a due date before today', 'error');
+    return;
+  }
 
   // ── Buyer info ─────────────────────────────────────────────────────────
   const buyerName = document.getElementById('creditBuyer')?.value.trim();

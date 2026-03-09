@@ -7,7 +7,7 @@
 const express = require('express');
 const Sale = require('../models/Sale');
 const Procurement = require('../models/Procurement');
-const { verifyToken, allowRoles } = require('../middleware/auth');
+const { verifyToken, allowRoles, blockReadOnly } = require('../middleware/auth');
 
 const router = express.Router();
 const UNSAFE_HTML_PATTERN = /[<>`]/;
@@ -102,7 +102,7 @@ async function deductStockAcrossProcurements({ produceName, branch, tonnage }) {
 
 // POST /api/sales
 // Records a cash sale and deducts stock atomically.
-router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), async (req, res) => {
+router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), blockReadOnly, async (req, res) => {
   try {
     const { produce_name, tonnage_kg, amount_paid_ugx, buyer_name } = req.body;
     const branch = req.user.branch;
