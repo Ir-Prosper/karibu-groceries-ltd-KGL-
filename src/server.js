@@ -109,6 +109,11 @@ const User = require('./models/User');
 const INITIAL_DIRECTOR_NAME = (process.env.INIT_DIRECTOR_NAME || '').trim();
 const INITIAL_DIRECTOR_EMAIL = (process.env.INIT_DIRECTOR_EMAIL || '').trim().toLowerCase();
 const INITIAL_DIRECTOR_PASSWORD = (process.env.INIT_DIRECTOR_PASSWORD || '').trim();
+const DEMO_USERS_ENABLED = String(process.env.DEMO_USERS_ENABLED || '').trim().toLowerCase() === 'true';
+const DEMO_USERS_PASSWORD = String(process.env.DEMO_USERS_PASSWORD || '').trim();
+const DEMO_DIRECTOR_EMAIL = (process.env.DEMO_DIRECTOR_EMAIL || 'directortest@karibu.com').trim().toLowerCase();
+const DEMO_MANAGER_EMAIL = (process.env.DEMO_MANAGER_EMAIL || 'managertest@karibu.com').trim().toLowerCase();
+const DEMO_AGENT_EMAIL = (process.env.DEMO_AGENT_EMAIL || 'agenttest@karibu.com').trim().toLowerCase();
 
 app.use('/api/auth', authRoutes);
 app.use('/api/procurement', procurementRoutes);
@@ -148,6 +153,56 @@ async function ensureInitialDirector() {
   console.log(`[BOOTSTRAP] Initial director created: ${INITIAL_DIRECTOR_EMAIL}`);
 }
 
+async function upsertDemoUser({ full_name, email, role, branch }) {
+  const existing = await User.findOne({ email });
+  if (existing) {
+    existing.full_name = full_name;
+    existing.role = role;
+    existing.branch = branch;
+    existing.status = 'active';
+    existing.read_only = true;
+    if (DEMO_USERS_PASSWORD) existing.password_hash = DEMO_USERS_PASSWORD;
+    await existing.save();
+    return 'updated';
+  }
+
+  if (!DEMO_USERS_PASSWORD) {
+    throw new Error('DEMO_USERS_PASSWORD is required when creating demo users.');
+  }
+
+  await User.create({
+    full_name,
+    email,
+    password_hash: DEMO_USERS_PASSWORD,
+    role,
+    branch,
+    status: 'active',
+    read_only: true
+  });
+  return 'created';
+}
+
+async function ensureDemoUsers() {
+  if (!DEMO_USERS_ENABLED) return;
+
+  const maganjo = await Branch.findOne({ name: 'Maganjo' }).select('_id status').lean();
+  if (!maganjo || maganjo.status !== 'active') {
+    console.warn('[BOOTSTRAP] Demo users skipped: Maganjo branch missing or inactive.');
+    return;
+  }
+
+  const users = [
+    { full_name: 'Test Director (Read Only)', email: DEMO_DIRECTOR_EMAIL, role: 'director', branch: null },
+    { full_name: 'Test Manager (Read Only)', email: DEMO_MANAGER_EMAIL, role: 'manager', branch: 'Maganjo' },
+    { full_name: 'Test Sales Agent (Read Only)', email: DEMO_AGENT_EMAIL, role: 'sales_agent', branch: 'Maganjo' }
+  ];
+
+  for (const user of users) {
+    const action = await upsertDemoUser(user);
+    console.log(`[BOOTSTRAP] Demo user ${action}: ${user.email}`);
+  }
+}
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
@@ -180,6 +235,7 @@ mongoose
       )
     )
       .then(() => ensureInitialDirector())
+      .then(() => ensureDemoUsers())
       .then(() => {
         app.listen(PORT, () => {
           console.log(`Server running on http://localhost:${PORT} (${process.env.NODE_ENV || 'development'})`);
