@@ -90,8 +90,6 @@ public/
 src/
   server.js
   middleware/auth.js
-  scripts/
-    fix-produce-conflicts.js
   models/
   routes/
   store/branchesStore.js
@@ -100,8 +98,6 @@ src/
 ## NPM Scripts
 - `npm run dev`: start API with nodemon
 - `npm start`: start API in normal mode
-- `npm run cleanup:produce:audit`: detect produce name/type conflicts and normalization candidates (dry-run)
-- `npm run cleanup:produce:apply`: apply produce normalization/conflict fixes
 
 ## Setup
 1. Install dependencies:
