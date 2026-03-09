@@ -11,9 +11,14 @@ const Branch = require('../models/Branch');
 const { verifyToken, allowRoles } = require('../middleware/auth');
 
 const router = express.Router();
+const UNSAFE_HTML_PATTERN = /[<>`]/;
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasUnsafeHtmlChars(value) {
+  return UNSAFE_HTML_PATTERN.test(String(value || ''));
 }
 
 // Ensure default branches exist once DB is available.
@@ -82,6 +87,9 @@ router.post('/', verifyToken, allowRoles('director'), async (req, res) => {
     if (!name || !location || !contact) {
       return res.status(400).json({ error: 'Name, location, and contact are required' });
     }
+    if ([name, location, email, manager].some((value) => hasUnsafeHtmlChars(value))) {
+      return res.status(400).json({ error: 'Text fields contain invalid characters' });
+    }
 
     const exists = await Branch.findOne({
       name: new RegExp(`^${escapeRegex(name.trim())}$`, 'i')
@@ -110,6 +118,9 @@ router.post('/', verifyToken, allowRoles('director'), async (req, res) => {
 router.patch('/:id', verifyToken, allowRoles('director'), async (req, res) => {
   try {
     const { name, location, contact, email, manager, status } = req.body;
+    if ([name, location, email, manager].some((value) => value !== undefined && hasUnsafeHtmlChars(value))) {
+      return res.status(400).json({ error: 'Text fields contain invalid characters' });
+    }
 
     const currentBranch = await Branch.findById(req.params.id);
     if (!currentBranch) {

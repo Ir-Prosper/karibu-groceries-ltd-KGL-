@@ -7,42 +7,53 @@
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
 
 const router = express.Router();
+const isProduction = process.env.NODE_ENV === 'production';
 
-router.post('/login', async (req, res) => {
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: Number(process.env.LOGIN_RATE_LIMIT_MAX || 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please try again later.' }
+});
+
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
 
-  if (!email || !password) {
-    console.log('[AUTH] Bad request: missing fields');
+  if (!normalizedEmail || !password) {
+    if (!isProduction) console.log('[AUTH] Bad request: missing fields');
     return res.status(400).json({ error: 'Email and password required' });
   }
 
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      console.log('[AUTH] Invalid attempt for:', email);
+      if (!isProduction) console.log('[AUTH] Invalid login attempt');
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     if (user.status === 'inactive') {
-      console.log('[AUTH] Blocked inactive account:', email);
+      if (!isProduction) console.log('[AUTH] Blocked inactive account');
       return res.status(403).json({ error: 'Account is inactive. Contact Director.' });
     }
 
     if (user.role !== 'director' && user.branch) {
       const branch = await Branch.findOne({ name: user.branch }).lean();
       if (branch && branch.status === 'inactive') {
-        console.log('[AUTH] Blocked by inactive branch:', email, 'branch:', user.branch);
+        if (!isProduction) console.log('[AUTH] Blocked by inactive branch');
         return res.status(403).json({ error: 'Your branch is inactive. Contact Director.' });
       }
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log('[AUTH] Invalid attempt for:', email);
+      if (!isProduction) console.log('[AUTH] Invalid login attempt');
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -52,7 +63,7 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    console.log('[AUTH] Login success for:', email, 'role:', user.role);
+    if (!isProduction) console.log('[AUTH] Login success:', user.role);
     return res.json({
       token,
       user: {
@@ -64,7 +75,7 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('[AUTH] Server error:', err);
+    console.error('[AUTH] Server error:', err.message);
     return res.status(500).json({ error: 'Server error' });
   }
 });

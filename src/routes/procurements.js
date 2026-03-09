@@ -39,6 +39,14 @@ function branchMatchQuery(field, rawBranch) {
   return { [field]: { $in: patterns } };
 }
 
+function normalizeProduceName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeProduceType(value) {
+  return String(value || '').trim();
+}
+
 // Startup migration: initialize remaining_kg for legacy records.
 (async () => {
   try {
@@ -68,9 +76,12 @@ router.post('/', verifyToken, allowRoles('manager'), async (req, res) => {
       return res.status(400).json({ error: 'Manager branch is missing from token' });
     }
 
+    const normalizedName = normalizeProduceName(req.body.name);
+    const normalizedType = normalizeProduceType(req.body.type);
+
     const procurementData = {
-      name: req.body.name,
-      type: req.body.type,
+      name: normalizedName,
+      type: normalizedType,
       tonnage_kg: req.body.tonnage_kg,
       price_to_sell: req.body.price_to_sell,
       contact: req.body.contact,
@@ -96,6 +107,63 @@ router.post('/', verifyToken, allowRoles('manager'), async (req, res) => {
       return res.status(400).json({
         error: 'Missing required fields',
         missing: missingFields
+      });
+    }
+
+    const produceRegex = new RegExp(`^${escapeRegex(normalizedName)}$`, 'i');
+    const existingRecords = await Procurement.find({
+      name: { $regex: produceRegex },
+      ...branchMatchQuery('branch', branch)
+    }).select('_id name type remaining_kg tonnage_kg');
+
+    if (existingRecords.length > 0) {
+      const typeMap = new Map();
+      let totalRemaining = 0;
+      let preferredRestockId = existingRecords[0]._id;
+
+      for (const record of existingRecords) {
+        const typeLabel = String(record.type || '').trim();
+        const typeKey = typeLabel.toLowerCase();
+        if (typeLabel && !typeMap.has(typeKey)) {
+          typeMap.set(typeKey, typeLabel);
+        }
+
+        const remaining = Number(
+          record.remaining_kg !== undefined && record.remaining_kg !== null
+            ? record.remaining_kg
+            : record.tonnage_kg
+        );
+        totalRemaining += Math.max(0, remaining || 0);
+
+        if (typeKey === normalizedType.toLowerCase()) {
+          preferredRestockId = record._id;
+        }
+      }
+
+      const knownTypes = Array.from(typeMap.values());
+      const hasRequestedType = typeMap.has(normalizedType.toLowerCase());
+      const stockInSystem = totalRemaining > 0;
+
+      if (!hasRequestedType) {
+        return res.status(400).json({
+          error: `Produce "${normalizedName}" already exists as type ${knownTypes.join(', ')}. Use the existing type and restock the existing record.`,
+          existing_types: knownTypes,
+          restock_procurement_id: String(preferredRestockId)
+        });
+      }
+
+      if (stockInSystem) {
+        return res.status(400).json({
+          error: `Produce "${normalizedName}" already exists and still has stock (${totalRemaining} kg). Do not add a new record; use restock on the existing produce.`,
+          remaining_kg: totalRemaining,
+          restock_procurement_id: String(preferredRestockId)
+        });
+      }
+
+      return res.status(400).json({
+        error: `Produce "${normalizedName}" already exists but is out of stock. Use restock instead of creating a new produce.`,
+        remaining_kg: 0,
+        restock_procurement_id: String(preferredRestockId)
       });
     }
 

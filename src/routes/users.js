@@ -12,6 +12,11 @@ const Branch = require('../models/Branch');
 const { verifyToken, allowRoles } = require('../middleware/auth');
 
 const router = express.Router();
+const UNSAFE_HTML_PATTERN = /[<>`]/;
+
+function hasUnsafeHtmlChars(value) {
+  return UNSAFE_HTML_PATTERN.test(String(value || ''));
+}
 
 router.get('/', verifyToken, allowRoles('director'), async (req, res) => {
   try {
@@ -26,41 +31,57 @@ router.get('/', verifyToken, allowRoles('director'), async (req, res) => {
 router.post('/', verifyToken, allowRoles('director'), async (req, res) => {
   try {
     const { full_name, email, password, role, branch } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedFullName = String(full_name || '').trim();
+    const normalizedBranch = typeof branch === 'string' ? branch.trim() : branch;
     const normalizedRole = role === 'agent' ? 'sales_agent' : role;
 
-    console.log('[USERS CREATE] Received:', { full_name, email, role: normalizedRole, branch });
+    console.log('[USERS CREATE] Received:', {
+      full_name: normalizedFullName,
+      email: normalizedEmail,
+      role: normalizedRole,
+      branch: normalizedBranch
+    });
 
-    if (!full_name || !email || !password || !normalizedRole) {
+    if (!normalizedFullName || !normalizedEmail || !password || !normalizedRole) {
       return res.status(400).json({ error: 'Full name, email, password and role are required' });
     }
+    if (hasUnsafeHtmlChars(normalizedFullName)) {
+      return res.status(400).json({ error: 'Full name contains invalid characters' });
+    }
 
-    if (normalizedRole !== 'director' && !branch) {
+    if (!['manager', 'sales_agent'].includes(normalizedRole)) {
+      return res.status(400).json({ error: 'Role must be manager or sales_agent' });
+    }
+
+    if (!normalizedBranch) {
       return res.status(400).json({ error: 'Branch is required for managers and agents' });
     }
 
-    if (normalizedRole !== 'director') {
-      const branchExists = await Branch.findOne({ name: branch }).select('_id status');
-      if (!branchExists) {
-        return res.status(400).json({ error: `Branch "${branch}" does not exist` });
-      }
+    const branchExists = await Branch.findOne({ name: normalizedBranch }).select('_id status');
+    if (!branchExists) {
+      return res.status(400).json({ error: `Branch "${normalizedBranch}" does not exist` });
+    }
+    if (branchExists.status !== 'active') {
+      return res.status(400).json({ error: `Branch "${normalizedBranch}" is inactive` });
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
     const user = new User({
-      full_name,
-      email,
+      full_name: normalizedFullName,
+      email: normalizedEmail,
       password_hash: password,
       role: normalizedRole,
-      branch: normalizedRole === 'director' ? null : branch,
+      branch: normalizedBranch,
       created_at: new Date()
     });
 
     await user.save();
-    console.log(`[USER CREATED] ${full_name} (${normalizedRole}) @ ${branch || 'All Branches'}`);
+    console.log(`[USER CREATED] ${normalizedFullName} (${normalizedRole}) @ ${normalizedBranch}`);
 
     const userObj = user.toObject();
     delete userObj.password_hash;
@@ -94,13 +115,19 @@ router.patch('/:id', verifyToken, allowRoles('director'), async (req, res) => {
     }
 
     const updates = {};
-    if (full_name) updates.full_name = full_name;
-    if (email) updates.email = email;
+    if (full_name) {
+      const cleanName = String(full_name).trim();
+      if (hasUnsafeHtmlChars(cleanName)) {
+        return res.status(400).json({ error: 'Full name contains invalid characters' });
+      }
+      updates.full_name = cleanName;
+    }
+    if (email) updates.email = String(email).trim().toLowerCase();
     if (phone) updates.phone = phone;
 
     if (role !== undefined) {
-      if (!normalizedRole || !['director', 'manager', 'sales_agent'].includes(normalizedRole)) {
-        return res.status(400).json({ error: 'Invalid role. Use director, manager, or sales_agent.' });
+      if (!normalizedRole || !['manager', 'sales_agent'].includes(normalizedRole)) {
+        return res.status(400).json({ error: 'Invalid role. Use manager or sales_agent.' });
       }
       updates.role = normalizedRole;
     }
@@ -112,14 +139,16 @@ router.patch('/:id', verifyToken, allowRoles('director'), async (req, res) => {
       updates.status = status;
     }
 
-    if (updates.role === 'director') {
-      updates.branch = null;
-    } else if (branch !== undefined) {
-      const branchExists = await Branch.findOne({ name: branch }).select('_id');
+    const requestedBranch = branch !== undefined ? String(branch).trim() : undefined;
+    if (requestedBranch !== undefined) {
+      const branchExists = await Branch.findOne({ name: requestedBranch }).select('_id status');
       if (!branchExists) {
-        return res.status(400).json({ error: `Branch "${branch}" does not exist` });
+        return res.status(400).json({ error: `Branch "${requestedBranch}" does not exist` });
       }
-      updates.branch = branch;
+      if (branchExists.status !== 'active') {
+        return res.status(400).json({ error: `Branch "${requestedBranch}" is inactive` });
+      }
+      updates.branch = requestedBranch;
     }
 
     const user = await User.findByIdAndUpdate(

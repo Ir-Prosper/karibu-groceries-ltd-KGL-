@@ -55,7 +55,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 2.1 Authentication Check
   // --------------------------------------------------------------------
   user = JSON.parse(localStorage.getItem('user'));
-  if (!user) {
+  if (!user || user.role !== 'manager') {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.href = '../../index.html';
     return;
   }
@@ -185,6 +187,23 @@ function populateTypeDropdowns() {
  */
 function getToken() {
   return localStorage.getItem('token') || null;
+}
+
+function escHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function escJs(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, ' ');
 }
 
 function apiFetch(url, options = {}) {
@@ -443,8 +462,8 @@ function displayStockTable(stock) {
     const remaining = item.remaining_kg ?? 0;
     const isLow = remaining > 0 && remaining <= LOW_STOCK_THRESHOLD;
     const isOut = remaining <= 0;
-    const safeName = String(item.name || '').replace(/'/g, "\\'");
-    const safeType = String(item.type || '').replace(/'/g, "\\'");
+    const safeName = escJs(item.name || '');
+    const safeType = escJs(item.type || '');
 
     // Apply CSS classes for row coloring
     let rowClass = '';
@@ -465,8 +484,8 @@ function displayStockTable(stock) {
     return `
       <tr class="${rowClass}" data-id="${item._id}" data-stock="${remaining}">
         <td>
-          <div class="produce-name">${item.name || 'Unknown'}</div>
-          <div class="produce-type">${item.type || 'N/A'}</div>
+          <div class="produce-name">${escHtml(item.name || 'Unknown')}</div>
+          <div class="produce-type">${escHtml(item.type || 'N/A')}</div>
           ${statusBadge}
         </td>
         <td class="${isLow ? 'warning-text' : ''} ${isOut ? 'danger-text' : ''}">
@@ -474,7 +493,7 @@ function displayStockTable(stock) {
         </td>
         <td>Ush ${(item.price_to_sell || 0).toLocaleString()}</td>
         <td>
-          <button class="action-btn" onclick="openRestockModal('${item._id}','${safeName}','${safeType}',${remaining})">
+          <button class="action-btn" onclick="openRestockModal('${escJs(item._id)}','${safeName}','${safeType}',${remaining})">
             <i class="bi bi-box-seam"></i> Restock
           </button>
         </td>
@@ -499,8 +518,8 @@ function populateSaleProduceDropdown(stock) {
   const inStock = (stock || []).filter(i => (i.remaining_kg ?? 0) > 0);
   saleSelect.innerHTML = '<option value="">Select produce</option>' +
     inStock.map(i =>
-      `<option value="${i._id}" data-price="${i.price_to_sell || 0}" data-name="${i.name}" data-type="${i.type || ''}">
-        ${i.name} (${(i.remaining_kg ?? 0).toLocaleString()} kg) - Ush ${(i.price_to_sell || 0).toLocaleString()}/kg
+      `<option value="${escHtml(i._id)}" data-price="${i.price_to_sell || 0}" data-name="${escHtml(i.name)}" data-type="${escHtml(i.type || '')}">
+        ${escHtml(i.name)} (${(i.remaining_kg ?? 0).toLocaleString()} kg) - Ush ${(i.price_to_sell || 0).toLocaleString()}/kg
       </option>`
     ).join('');
 
@@ -518,8 +537,8 @@ function populateCreditProduceDropdown(stock) {
   const inStock = (stock || []).filter(i => (i.remaining_kg ?? 0) > 0);
   creditSelect.innerHTML = '<option value="">Select produce</option>' +
     inStock.map(i =>
-      `<option value="${i._id}" data-price="${i.price_to_sell || 0}" data-name="${i.name}" data-type="${i.type || ''}">
-        ${i.name} (${(i.remaining_kg ?? 0).toLocaleString()} kg available)
+      `<option value="${escHtml(i._id)}" data-price="${i.price_to_sell || 0}" data-name="${escHtml(i.name)}" data-type="${escHtml(i.type || '')}">
+        ${escHtml(i.name)} (${(i.remaining_kg ?? 0).toLocaleString()} kg available)
       </option>`
     ).join('');
 
@@ -572,8 +591,8 @@ window.openRestockModal = (produceId, produceName, produceType, currentStock) =>
         </div>
 
         <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:0.9rem;">
-          <div style="margin-bottom:6px;"><strong>Product:</strong> ${produceName}</div>
-          <div style="margin-bottom:6px;"><strong>Type:</strong> ${produceType || 'N/A'}</div>
+          <div style="margin-bottom:6px;"><strong>Product:</strong> ${escHtml(produceName)}</div>
+          <div style="margin-bottom:6px;"><strong>Type:</strong> ${escHtml(produceType || 'N/A')}</div>
           <div style="color:var(--text-gray);"><strong>Current Stock:</strong> ${currentStock.toLocaleString()} kg</div>
         </div>
 
@@ -794,7 +813,7 @@ function renderCreditsTable(credits) {
 
     const actionBtn = c.status !== 'paid'
       ? `<button class="action-btn" style="font-size:0.78rem;padding:5px 10px;"
-           onclick="openPaymentModal('${c._id}','${c.buyer_name}',${c.amount_due_ugx},${c.amount_paid_ugx})">
+           onclick="openPaymentModal('${escJs(c._id)}','${escJs(c.buyer_name)}',${c.amount_due_ugx},${c.amount_paid_ugx})">
            <i class="bi bi-cash-coin"></i> Record Payment
          </button>`
       : '<span style="color:#6b7280;font-size:0.8rem;">Settled</span>';
@@ -802,8 +821,8 @@ function renderCreditsTable(credits) {
     return `
       <tr>
         <td>
-          <div class="produce-name">${c.produce_name || 'N/A'}</div>
-          <div class="produce-type" style="font-size:0.75rem;color:#6b7280;">${c.buyer_name || ''}</div>
+          <div class="produce-name">${escHtml(c.produce_name || 'N/A')}</div>
+          <div class="produce-type" style="font-size:0.75rem;color:#6b7280;">${escHtml(c.buyer_name || '')}</div>
         </td>
         <td>${(c.tonnage_kg || 0).toLocaleString()} kg</td>
         <td>
@@ -1001,10 +1020,10 @@ function renderSalesTable(sales) {
 
   tbody.innerHTML = sales.map(s => `
     <tr>
-      <td>${s.produce_name || 'N/A'}</td>
+      <td>${escHtml(s.produce_name || 'N/A')}</td>
       <td>${(s.tonnage_kg || 0).toLocaleString()} kg</td>
       <td>Ush ${(s.amount_paid_ugx || 0).toLocaleString()}</td>
-      <td>${s.buyer_name || 'N/A'}</td>
+      <td>${escHtml(s.buyer_name || 'N/A')}</td>
       <td>${formatSaleDateTime(s)}</td>
     </tr>`).join('');
 }
@@ -1555,7 +1574,7 @@ function showAlertsPanel(low, out) {
             <div class="alert-list">
               ${low.map(i => `
                 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                  <span>${i.name}</span>
+                  <span>${escHtml(i.name)}</span>
                   <span style="font-weight:700;color:#f59e0b;">${(i.remaining_kg ?? 0).toLocaleString()} kg</span>
                 </div>`).join('')}
             </div>
@@ -1570,7 +1589,7 @@ function showAlertsPanel(low, out) {
             <div class="alert-list">
               ${out.map(i => `
                 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                  <span>${i.name}</span>
+                  <span>${escHtml(i.name)}</span>
                   <span style="font-weight:700;color:#dc2626;">0 kg</span>
                 </div>`).join('')}
             </div>

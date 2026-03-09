@@ -6,7 +6,9 @@
     "scripts":  {
                     "start":  "node src/server.js",
                     "dev":  "nodemon src/server.js",
-                    "build":  "node -e \"console.log('No build step required for this backend service.')\""
+                    "build":  "node -e \"console.log('No build step required for this backend service.')\"",
+                    "cleanup:produce:audit": "node src/scripts/fix-produce-conflicts.js",
+                    "cleanup:produce:apply": "node src/scripts/fix-produce-conflicts.js --apply"
                 },
     "keywords":  [
 

@@ -41,7 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Auth check ────────────────────────────────────────────────────────
   user = JSON.parse(localStorage.getItem('user'));
-  if (!user) {
+  if (!user || !['sales_agent', 'agent'].includes(String(user.role || '').toLowerCase())) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.href = '../../index.html';
     return;
   }
@@ -118,6 +120,23 @@ function populateTypeDropdowns() {
 /** Returns JWT token from localStorage for Authorization headers. */
 function getToken() {
   return localStorage.getItem('token') || null;
+}
+
+function escHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function escJs(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, ' ');
 }
 
 function apiFetch(url, options = {}) {
@@ -298,8 +317,8 @@ function displayStockTable(stock) {
     return `
       <tr class="${rowClass}" data-id="${item._id}" data-stock="${qty}">
         <td>
-          <div class="produce-name">${item.name || 'Unknown'}</div>
-          <div class="produce-type">${item.type || 'N/A'}</div>
+          <div class="produce-name">${escHtml(item.name || 'Unknown')}</div>
+          <div class="produce-type">${escHtml(item.type || 'N/A')}</div>
           ${isLow ? '<span class="stock-warning">⚠️ Low Stock</span>'   : ''}
           ${isOut ? '<span class="stock-danger">❌ Out of Stock</span>' : ''}
         </td>
@@ -310,7 +329,7 @@ function displayStockTable(stock) {
         <td>
           ${isOut
             ? '<span class="out-of-stock">Out of Stock</span>'
-            : `<button class="action-btn" onclick="quickSell('${item._id}','${item.name}',${qty})">
+            : `<button class="action-btn" onclick="quickSell('${escJs(item._id)}','${escJs(item.name)}',${qty})">
                  <i class="bi bi-cart-plus"></i> Quick Sell
                </button>`}
         </td>
@@ -334,8 +353,8 @@ function populateProduceDropdowns(stock) {
   if (saleSelect) {
     saleSelect.innerHTML = '<option value="">Select produce</option>' +
       inStock.map(i =>
-        `<option value="${i._id}" data-price="${i.price_to_sell || 0}" data-name="${i.name}" data-type="${i.type || ''}">
-           ${i.name} (${(i.remaining_kg ?? 0).toLocaleString()} kg) — Ush ${(i.price_to_sell || 0).toLocaleString()}/kg
+        `<option value="${escHtml(i._id)}" data-price="${i.price_to_sell || 0}" data-name="${escHtml(i.name)}" data-type="${escHtml(i.type || '')}">
+           ${escHtml(i.name)} (${(i.remaining_kg ?? 0).toLocaleString()} kg) — Ush ${(i.price_to_sell || 0).toLocaleString()}/kg
          </option>`
       ).join('');
     if (previousSaleValue && inStock.some(i => String(i._id) === String(previousSaleValue))) {
@@ -347,8 +366,8 @@ function populateProduceDropdowns(stock) {
   if (creditSelect) {
     creditSelect.innerHTML = '<option value="">Select produce</option>' +
       stock.map(i =>
-        `<option value="${i._id}" data-price="${i.price_to_sell || 0}" data-name="${i.name}" data-type="${i.type || ''}">
-           ${i.name} (${(i.remaining_kg ?? 0).toLocaleString()} kg available)
+        `<option value="${escHtml(i._id)}" data-price="${i.price_to_sell || 0}" data-name="${escHtml(i.name)}" data-type="${escHtml(i.type || '')}">
+           ${escHtml(i.name)} (${(i.remaining_kg ?? 0).toLocaleString()} kg available)
          </option>`
       ).join('');
     if (previousCreditValue && stock.some(i => String(i._id) === String(previousCreditValue))) {
@@ -457,10 +476,10 @@ async function loadRecentSales() {
 
     tbody.innerHTML = recent.map(s => `
       <tr>
-        <td>${s.produce_name || 'N/A'}</td>
+        <td>${escHtml(s.produce_name || 'N/A')}</td>
         <td>${(s.tonnage_kg || 0).toLocaleString()} kg</td>
         <td>Ush ${(s.amount_paid_ugx || 0).toLocaleString()}</td>
-        <td>${s.buyer_name || 'N/A'}</td>
+        <td>${escHtml(s.buyer_name || 'N/A')}</td>
         <td>${s.date ? new Date(s.date).toLocaleDateString() : ''} ${s.time || ''}</td>
       </tr>`).join('');
 
@@ -542,7 +561,7 @@ function renderCreditsTable(credits) {
     // Action button — hidden if already paid
     const actionBtn = c.status !== 'paid'
       ? `<button class="action-btn" style="font-size:0.78rem;padding:5px 10px;"
-           onclick="openPaymentModal('${c._id}','${c.buyer_name}',${c.amount_due_ugx},${c.amount_paid_ugx})">
+           onclick="openPaymentModal('${escJs(c._id)}','${escJs(c.buyer_name)}',${c.amount_due_ugx},${c.amount_paid_ugx})">
            <i class="bi bi-cash-coin"></i> Record Payment
          </button>`
       : '<span style="color:#6b7280;font-size:0.8rem;">Settled</span>';
@@ -550,8 +569,8 @@ function renderCreditsTable(credits) {
     return `
       <tr>
         <td>
-          <div class="produce-name">${c.produce_name || 'N/A'}</div>
-          <div class="produce-type" style="font-size:0.75rem;color:#6b7280;">${c.buyer_name || ''}</div>
+          <div class="produce-name">${escHtml(c.produce_name || 'N/A')}</div>
+          <div class="produce-type" style="font-size:0.75rem;color:#6b7280;">${escHtml(c.buyer_name || '')}</div>
         </td>
         <td>${(c.tonnage_kg || 0).toLocaleString()} kg</td>
         <td>
@@ -1147,7 +1166,7 @@ function showAlertsPanel(low, out) {
             <div class="alert-list">
               ${low.map(i => `
                 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                  <span>${i.name}</span>
+                  <span>${escHtml(i.name)}</span>
                   <span style="font-weight:700;color:#f59e0b;">${(i.remaining_kg ?? 0).toLocaleString()} kg</span>
                 </div>`).join('')}
             </div>
@@ -1162,7 +1181,7 @@ function showAlertsPanel(low, out) {
             <div class="alert-list">
               ${out.map(i => `
                 <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;">
-                  <span>${i.name}</span>
+                  <span>${escHtml(i.name)}</span>
                   <span style="font-weight:700;color:#dc2626;">0 kg</span>
                 </div>`).join('')}
             </div>
@@ -1323,8 +1342,8 @@ function showSaleReceiptPrompt(data) {
         </button>
       </div>
       <p style="font-size:0.82rem;color:#4b5563;margin-bottom:12px;">
-        ${data.tonnage.toLocaleString()} kg of <strong>${data.produce}</strong>
-        sold to <strong>${data.buyer}</strong>
+        ${data.tonnage.toLocaleString()} kg of <strong>${escHtml(data.produce)}</strong>
+        sold to <strong>${escHtml(data.buyer)}</strong>
       </p>
       <div style="display:flex;gap:8px;">
         <button onclick="document.getElementById('receiptPrompt')?.remove()"
@@ -1357,7 +1376,7 @@ function printSaleReceipt(data) {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Sale Receipt — ${data.ref}</title>
+      <title>Sale Receipt — ${escHtml(data.ref)}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Segoe UI',sans-serif; padding:24px; color:#1a1a1a; font-size:13px; }
@@ -1385,14 +1404,14 @@ function printSaleReceipt(data) {
     <body>
       <div class="header">
         <h1>Karibu Groceries LTD</h1>
-        <p>${data.branch} Branch</p>
+        <p>${escHtml(data.branch)} Branch</p>
         <span class="badge">✅ CASH SALE</span>
       </div>
 
       <div class="section">
         <div class="row">
           <span class="label">Produce</span>
-          <span class="value">${data.produce}</span>
+          <span class="value">${escHtml(data.produce)}</span>
         </div>
         <div class="row">
           <span class="label">Tonnage</span>
@@ -1400,15 +1419,15 @@ function printSaleReceipt(data) {
         </div>
         <div class="row">
           <span class="label">Buyer</span>
-          <span class="value">${data.buyer}</span>
+          <span class="value">${escHtml(data.buyer)}</span>
         </div>
         <div class="row">
           <span class="label">Sales Agent</span>
-          <span class="value">${data.agent}</span>
+          <span class="value">${escHtml(data.agent)}</span>
         </div>
         <div class="row">
           <span class="label">Date & Time</span>
-          <span class="value">${data.date}</span>
+          <span class="value">${escHtml(data.date)}</span>
         </div>
       </div>
 
@@ -1419,7 +1438,7 @@ function printSaleReceipt(data) {
 
       <div class="footer">
         <p>Thank you for trading with Karibu Groceries LTD</p>
-        <p class="ref">Ref: ${data.ref}</p>
+        <p class="ref">Ref: ${escHtml(data.ref)}</p>
       </div>
 
       <script>window.onload = () => { window.print(); }<\/script>
@@ -1457,7 +1476,7 @@ function showCreditDispatchPrompt(data) {
         </button>
       </div>
       <p style="font-size:0.82rem;color:#4b5563;margin-bottom:12px;">
-        Credit for <strong>${data.buyer}</strong> —
+        Credit for <strong>${escHtml(data.buyer)}</strong> —
         due <strong>${new Date(data.dueDate).toLocaleDateString()}</strong>
       </p>
       <div style="display:flex;gap:8px;">
@@ -1489,7 +1508,7 @@ function printCreditDispatchNote(data) {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Dispatch Note — ${data.ref}</title>
+      <title>Dispatch Note — ${escHtml(data.ref)}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Segoe UI',sans-serif; padding:24px; color:#1a1a1a; font-size:13px; }
@@ -1520,20 +1539,20 @@ function printCreditDispatchNote(data) {
     <body>
       <div class="header">
         <h1>Karibu Groceries LTD</h1>
-        <p>${data.branch} Branch — Credit Dispatch Note</p>
+        <p>${escHtml(data.branch)} Branch — Credit Dispatch Note</p>
         <span class="badge">📋 CREDIT SALE</span>
       </div>
 
       <h3>Goods Dispatched</h3>
-      <div class="row"><span class="label">Produce</span><span class="value">${data.produce} (${data.type})</span></div>
+      <div class="row"><span class="label">Produce</span><span class="value">${escHtml(data.produce)} (${escHtml(data.type)})</span></div>
       <div class="row"><span class="label">Tonnage</span><span class="value">${data.tonnage.toLocaleString()} kg</span></div>
-      <div class="row"><span class="label">Dispatch Date</span><span class="value">${data.dispatch}</span></div>
+      <div class="row"><span class="label">Dispatch Date</span><span class="value">${escHtml(data.dispatch)}</span></div>
 
       <h3>Buyer Details</h3>
-      <div class="row"><span class="label">Full Name</span><span class="value">${data.buyer}</span></div>
-      <div class="row"><span class="label">National ID (NIN)</span><span class="value">${data.nationalId}</span></div>
-      <div class="row"><span class="label">Location</span><span class="value">${data.location}</span></div>
-      <div class="row"><span class="label">Phone</span><span class="value">${data.contact}</span></div>
+      <div class="row"><span class="label">Full Name</span><span class="value">${escHtml(data.buyer)}</span></div>
+      <div class="row"><span class="label">National ID (NIN)</span><span class="value">${escHtml(data.nationalId)}</span></div>
+      <div class="row"><span class="label">Location</span><span class="value">${escHtml(data.location)}</span></div>
+      <div class="row"><span class="label">Phone</span><span class="value">${escHtml(data.contact)}</span></div>
 
       <div class="amount-box">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -1549,7 +1568,7 @@ function printCreditDispatchNote(data) {
       </div>
 
       <h3>Recorded By</h3>
-      <div class="row"><span class="label">Sales Agent</span><span class="value">${data.agent}</span></div>
+      <div class="row"><span class="label">Sales Agent</span><span class="value">${escHtml(data.agent)}</span></div>
 
       <div class="sign-section">
         <div class="sign-box">
@@ -1564,7 +1583,7 @@ function printCreditDispatchNote(data) {
 
       <div class="footer">
         <p>This note is proof of goods received on credit from Karibu Groceries LTD</p>
-        <p class="ref">Ref: ${data.ref}</p>
+        <p class="ref">Ref: ${escHtml(data.ref)}</p>
       </div>
 
       <script>window.onload = () => { window.print(); }<\/script>

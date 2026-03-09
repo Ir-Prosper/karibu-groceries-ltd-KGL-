@@ -11,9 +11,14 @@ const Procurement = require('../models/Procurement');
 const { verifyToken, allowRoles } = require('../middleware/auth');
 
 const router = express.Router();
+const UNSAFE_HTML_PATTERN = /[<>`]/;
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasUnsafeHtmlChars(value) {
+  return UNSAFE_HTML_PATTERN.test(String(value || ''));
 }
 
 function branchAliases(rawBranch) {
@@ -30,7 +35,7 @@ function branchMatchQuery(field, rawBranch) {
   return { [field]: { $in: patterns } };
 }
 
-async function deductStockAcrossProcurements({ produceName, branch, tonnage }) {
+async function deductStockAcrossProcurements({ produceName, branch, tonnage, expectedType }) {
   const produceRegex = new RegExp(`^${escapeRegex(produceName)}$`, 'i');
   const lots = await Procurement.find({
     name: { $regex: produceRegex },
@@ -39,6 +44,30 @@ async function deductStockAcrossProcurements({ produceName, branch, tonnage }) {
 
   if (lots.length === 0) {
     return { error: `No procurement found for "${produceName}" at ${branch} branch`, status: 404 };
+  }
+
+  const typeMap = new Map();
+  for (const lot of lots) {
+    const label = String(lot.type || '').trim();
+    const key = label.toLowerCase();
+    if (label && !typeMap.has(key)) {
+      typeMap.set(key, label);
+    }
+  }
+
+  if (typeMap.size > 1) {
+    return {
+      error: `Produce "${produceName}" has inconsistent types in stock (${Array.from(typeMap.values()).join(', ')}). Fix procurement records before creating a credit sale.`,
+      status: 400
+    };
+  }
+
+  const canonicalType = Array.from(typeMap.values())[0] || '';
+  if (expectedType && canonicalType && canonicalType.toLowerCase() !== String(expectedType).toLowerCase()) {
+    return {
+      error: `Produce type mismatch. "${produceName}" is stocked as "${canonicalType}", not "${expectedType}".`,
+      status: 400
+    };
   }
 
   const totalAvailable = lots.reduce((sum, lot) => {
@@ -127,6 +156,9 @@ router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), asy
     if (!buyerName || buyerName.length < 2) {
       return res.status(400).json({ error: 'buyer_name must be at least 2 characters' });
     }
+    if ([buyerName, buyerLocation, produceType].some((value) => hasUnsafeHtmlChars(value))) {
+      return res.status(400).json({ error: 'Text fields contain invalid characters' });
+    }
 
     if (!/^[A-Z0-9]{14,16}$/.test(nationalId)) {
       return res.status(400).json({ error: 'national_id must be 14-16 uppercase alphanumeric characters' });
@@ -147,7 +179,8 @@ router.post('/', verifyToken, allowRoles('manager', 'sales_agent', 'agent'), asy
     const stockResult = await deductStockAcrossProcurements({
       produceName,
       branch,
-      tonnage
+      tonnage,
+      expectedType: produceType
     });
     if (stockResult.error) {
       return res.status(stockResult.status).json({ error: stockResult.error });
