@@ -8,11 +8,7 @@
                     "dev":  "nodemon src/server.js",
                     "build":  "node -e \"console.log('No build step required for this backend service.')\"",
                     "cleanup:produce:audit": "node src/scripts/fix-produce-conflicts.js",
-                    "cleanup:produce:apply": "node src/scripts/fix-produce-conflicts.js --apply",
-                    "cleanup:produce:dedupe:audit": "node src/scripts/dedupe-produce-by-branch.js",
-                    "cleanup:produce:dedupe:apply": "node src/scripts/dedupe-produce-by-branch.js --apply",
-                    "users:create-readonly-test": "node src/scripts/create-readonly-test-users.js",
-                    "audit:authz:data": "node src/scripts/audit-users-branches.js"
+                    "cleanup:produce:apply": "node src/scripts/fix-produce-conflicts.js --apply"
                 },
     "keywords":  [
 

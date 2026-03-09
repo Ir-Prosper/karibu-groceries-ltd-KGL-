@@ -32,9 +32,10 @@ Branch-based wholesale management system for:
 - Branch isolation is enforced from JWT branch for non-director users.
 
 ## Dashboard Auto Refresh
-- Sales agent dashboard polling: every **60s**
-- Manager dashboard polling: every **60s**
+- Sales agent dashboard polling: every **30s**
+- Manager dashboard polling: every **30s**
 - Director dashboard polling: every **30s**
+- While filling Manager/Sales forms, polling keeps notifications updated without resetting selected produce fields.
 
 ## Professional Screenshots
 Place production-ready screenshots in `docs/screenshots/` using the exact filenames below.
@@ -180,7 +181,7 @@ After creating services from `render.yaml`:
    Example: `https://karibu-groceries-ltd-frontend.onrender.com`
 2. In `public/js/config.js`, set:
 ```js
-window.__KGL_API_BASE__ = 'https://kgl-procurement-api.onrender.com';
+window.__KGL_API_BASE__ = 'https://karibu-groceries-api.onrender.com';
 ```
 3. Redeploy frontend, then share the frontend URL for dashboard testing.
 
