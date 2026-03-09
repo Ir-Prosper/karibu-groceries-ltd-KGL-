@@ -1,5 +1,12 @@
 /*
  * Frontend runtime config:
- * - Set to your Render backend URL
+ * - On Render frontend URL, use Render API
+ * - On local Live Server, leave blank so common.js resolves to localhost:5000/api
  */
-window.__KGL_API_BASE__ = 'https://karibu-groceries-api.onrender.com';
+(() => {
+  const host = String(window.location.hostname || '').toLowerCase();
+  const isRenderFrontend = host === 'karibu-groceries-frontend.onrender.com';
+  window.__KGL_API_BASE__ = isRenderFrontend
+    ? 'https://karibu-groceries-api.onrender.com'
+    : '';
+})();
