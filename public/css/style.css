@@ -2674,6 +2674,17 @@ body.dashboard .badge {
   }
 }
 
+@media (max-width: 420px) {
+  body.dashboard .stats-row {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  body.dashboard .stat-card {
+    flex: 1 1 100%;
+  }
+}
+
 /* ======================================================================
    SECTION 11: DIRECTOR DASHBOARD STYLES - COMPACT VERSION
    ====================================================================== */
