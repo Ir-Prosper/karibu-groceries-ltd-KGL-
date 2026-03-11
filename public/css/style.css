@@ -662,6 +662,11 @@ body.login-page .page-login-footer {
     gap: 8px;
   }
 
+  body.login-page .brand-logos-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
   body.login-page .brand-logos-row .brand-login-logo {
     width: 84px;
     max-width: 84px;
@@ -672,6 +677,17 @@ body.login-page .page-login-footer {
 
   body.login-page .brand-side-logo {
     border-radius: 12px;
+  }
+
+  body.login-page .brand-side-logo {
+    display: none;
+  }
+
+  body.login-page .btn-primary {
+    display: flex;
+    justify-content: center;
+    font-size: 1rem;
+    line-height: 1;
   }
 
   body.login-page .login-panel {
@@ -2575,6 +2591,22 @@ body.dashboard .badge {
   
   body.dashboard .search-bar {
     width: 100%;
+  }
+
+  body.dashboard .content-area {
+    padding-bottom: 90px;
+  }
+
+  body.dashboard .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.dashboard .form-actions .btn-primary,
+  body.dashboard .form-actions .btn-cancel,
+  body.dashboard .form-actions .btn-submit {
+    width: 100%;
+    justify-content: center;
   }
 
   /* Keep tables usable on small screens */
