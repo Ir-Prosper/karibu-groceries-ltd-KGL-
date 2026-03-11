@@ -69,6 +69,7 @@ body {
   
   /* Layout */
   --sidebar-width:  280px;
+  --sidebar-collapsed-width: 76px;
 }
 
 /* ======================================================================
@@ -683,6 +684,24 @@ body.login-page .page-login-footer {
   }
 }
 
+/* Allow scrolling on small screens so the login form stays reachable */
+@media (max-width: 900px), (max-height: 720px) {
+  html,
+  body,
+  .login-page,
+  .login-container {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.login-page .login-card {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 /* ======================================================================
    SECTION 3: SIDEBAR (Common across all dashboards)
    ====================================================================== */
@@ -930,15 +949,134 @@ body.dashboard .sidebar-backdrop.active {
 }
 
 body.dashboard .sidebar {
-  transition: left 0.3s ease, transform 0.3s ease;
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 body.dashboard.sidebar-collapsed .sidebar {
-  transform: translateX(calc(-1 * var(--sidebar-width)));
+  transform: none;
+  width: var(--sidebar-collapsed-width);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+  overflow: visible;
 }
 
 body.dashboard.sidebar-collapsed .main-content {
-  margin-left: 0;
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+body.dashboard .main-content {
+  transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.dashboard.sidebar-collapsed .sidebar-header h2,
+body.dashboard.sidebar-collapsed .user-profile {
+  display: none;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-header {
+  padding: 18px 12px 12px;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-logo {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 0;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav {
+  padding: 10px 0;
+  overflow: visible;
+  overflow-y: auto;
+  height: 100%;
+  overflow-x: visible;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a {
+  justify-content: center;
+  padding: 12px 0;
+  gap: 0;
+  font-size: 0;
+  line-height: 0;
+  overflow: visible;
+  white-space: nowrap;
+  color: transparent;
+  text-shadow: none;
+  min-height: 44px;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a i {
+  width: auto;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #ffffff !important;
+  flex-shrink: 0;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a.logout {
+  margin-left: 12px;
+  margin-right: 12px;
+  padding: 12px 0;
+}
+
+/* Icon-only tooltip (collapsed sidebar) */
+body.dashboard.sidebar-collapsed .sidebar-nav a {
+  position: relative;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a::after {
+  content: none;
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-6px);
+  background: #0f2c6b;
+  color: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 2000;
+  display: block;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a::before {
+  content: none;
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #1b3f7a;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+  z-index: 2000;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a:hover::after,
+body.dashboard.sidebar-collapsed .sidebar-nav a:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.dashboard.sidebar-collapsed .sidebar-nav a:hover::after {
+  transform: translateY(-50%) translateX(0);
 }
 
 body.dashboard .content-header h1 {
@@ -1376,6 +1514,133 @@ body.dashboard .no-results {
   color: var(--text-gray);
   font-style: italic;
   font-size: 0.9rem;
+}
+
+/* Table filter toolbar */
+body.dashboard .table-toolbar {
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+body.dashboard .table-toolbar.sticky-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+body.dashboard .dashboard-filters {
+  margin-top: 0;
+}
+
+body.dashboard .main-content > .dashboard-filters {
+  margin: 0 25px 12px;
+}
+
+body.dashboard .director-filters {
+  margin: 0 25px 12px;
+}
+
+body.dashboard .filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+body.dashboard .filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+body.dashboard .filter-group i {
+  color: var(--navy-dark);
+}
+
+body.dashboard .filter-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+}
+
+body.dashboard .filter-select {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  color: var(--text-dark);
+  min-height: 36px;
+}
+
+body.dashboard .filter-reset-btn {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy-dark);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  min-height: 36px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+body.dashboard .filter-reset-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(15, 44, 107, 0.15);
+}
+
+/* Pagination */
+body.dashboard .pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+body.dashboard .pagination-controls button {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: var(--navy-dark);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+body.dashboard .pagination-controls button.active {
+  background: var(--navy-dark);
+  color: #ffffff;
+  border-color: var(--navy-dark);
+}
+
+body.dashboard .pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+body.dashboard .pagination-info {
+  color: var(--text-gray);
+  font-size: 0.85rem;
 }
 
 /* Section header with button (for Recent Sales) */
@@ -2312,6 +2577,50 @@ body.dashboard .badge {
     width: 100%;
   }
 
+  /* Keep tables usable on small screens */
+  body.dashboard .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.dashboard .data-table {
+    min-width: 640px;
+  }
+
+  /* Dashboard filter bar spacing on small screens */
+  body.dashboard .main-content > .dashboard-filters {
+    margin: 0 16px 12px;
+    padding: 10px 12px;
+  }
+
+  body.dashboard .dashboard-filters .filter-row {
+    gap: 8px;
+  }
+
+  body.dashboard .dashboard-filters .filter-group,
+  body.dashboard .dashboard-filters .filter-select,
+  body.dashboard .dashboard-filters .filter-reset-btn {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.dashboard .director-filters {
+    margin: 0 16px 12px;
+    padding: 10px 12px;
+  }
+
+  body.dashboard .director-filters .filter-row {
+    gap: 8px;
+  }
+
+  body.dashboard .director-filters .filter-group,
+  body.dashboard .director-filters .filter-select {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
   /* Mobile sidebar must scroll end-to-end so logout is always reachable. */
   body.dashboard.manager .sidebar,
   body.dashboard.director .sidebar,
@@ -2603,6 +2912,15 @@ body.dashboard.director .sidebar-nav a.logout {
   margin-bottom: 14px;
 }
 
+/* Keep director filter toolbars pinned and above table rows */
+body.dashboard.director .table-toolbar.sticky-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 120;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 44, 107, 0.08);
+}
+
 /* ----------------------------------------------------------------------
    11.7 Manager Sidebar Fit (manager only)
    ---------------------------------------------------------------------- */
@@ -2646,6 +2964,16 @@ body.dashboard.manager .sidebar-nav {
   padding: 8px 0 10px;
 }
 
+body.dashboard.director.sidebar-collapsed .sidebar-nav,
+body.dashboard.manager.sidebar-collapsed .sidebar-nav {
+  overflow-y: auto;
+}
+
+body.dashboard.director.sidebar-collapsed .sidebar,
+body.dashboard.manager.sidebar-collapsed .sidebar {
+  overflow: visible;
+}
+
 body.dashboard.manager .sidebar-nav a {
   padding: 10px 20px;
   font-size: 0.92rem;
@@ -2681,6 +3009,32 @@ body.dashboard.director .badge {
   border-radius: 10px;
   min-width: 16px;
   text-align: center;
+}
+
+/* Collapsed sidebar overrides for manager/director (ensure icons stay visible) */
+body.dashboard.manager.sidebar-collapsed .sidebar-nav a,
+body.dashboard.director.sidebar-collapsed .sidebar-nav a {
+  justify-content: center;
+  padding: 12px 0;
+  gap: 0;
+  font-size: 0;
+  line-height: 0;
+  color: transparent;
+  text-shadow: none;
+  overflow: visible;
+}
+
+body.dashboard.manager.sidebar-collapsed .sidebar-nav a i,
+body.dashboard.director.sidebar-collapsed .sidebar-nav a i {
+  width: auto;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #ffffff !important;
+}
+
+body.dashboard.manager.sidebar-collapsed .sidebar-nav,
+body.dashboard.director.sidebar-collapsed .sidebar-nav {
+  overflow-y: auto;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════

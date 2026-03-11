@@ -149,6 +149,53 @@
 
     </div>
 
+    <div id="directorUsersFiltersBar" class="table-toolbar director-filters" style="display:none;">
+      <div class="filter-row">
+        <div class="filter-group">
+          <i class="bi bi-search"></i>
+          <input id="userSearchInput" class="filter-input" type="text" placeholder="Search name, email, branch">
+        </div>
+        <select id="userRoleFilter" class="filter-select">
+          <option value="">All Roles</option>
+          <option value="manager">Manager</option>
+          <option value="sales_agent">Sales Agent</option>
+          <option value="director">Director</option>
+        </select>
+        <select id="userBranchFilter" class="filter-select">
+          <option value="">All Branches</option>
+        </select>
+        <select id="userStatusFilter" class="filter-select">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select id="userPageSize" class="filter-select">
+          <option value="10">10 / page</option>
+          <option value="20">20 / page</option>
+          <option value="50">50 / page</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="directorBranchesFiltersBar" class="table-toolbar director-filters" style="display:none;">
+      <div class="filter-row">
+        <div class="filter-group">
+          <i class="bi bi-search"></i>
+          <input id="branchSearchInput" class="filter-input" type="text" placeholder="Search branch name, location, contact">
+        </div>
+        <select id="branchStatusFilter" class="filter-select">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select id="branchPageSize" class="filter-select">
+          <option value="10">10 / page</option>
+          <option value="20">20 / page</option>
+          <option value="50">50 / page</option>
+        </select>
+      </div>
+    </div>
+
     <!-- CONTENT AREA -->
     <div class="content-area">
 
@@ -363,6 +410,8 @@
           </table>
         </div>
 
+        <div id="usersPagination" class="pagination-controls"></div>
+
       </section>
 
       <!-- ════════════════════════════════════════════════════════ -->
@@ -396,6 +445,8 @@
             </tbody>
           </table>
         </div>
+
+        <div id="branchesPagination" class="pagination-controls"></div>
 
       </section>
 

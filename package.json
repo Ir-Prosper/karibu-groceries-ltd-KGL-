@@ -1,33 +1,32 @@
-﻿{
-    "name":  "karibu-groceries-ltd",
-    "version":  "1.0.0",
-    "description":  "Branch-based wholesale management API for Karibu Groceries (stock, sales, credit, users, and branches).",
-    "main":  "src/server.js",
-    "scripts":  {
-                    "start":  "node src/server.js",
-                    "dev":  "nodemon src/server.js",
-                    "build":  "node -e \"console.log('No build step required for this backend service.')\""
-                },
-    "keywords":  [
-
-                 ],
-    "author":  "",
-    "license":  "ISC",
-    "type":  "commonjs",
-    "engines":  {
-                    "node":  ">=20"
-                },
-    "dependencies":  {
-                         "bcryptjs":  "^3.0.3",
-                         "cors":  "^2.8.6",
-                         "dotenv":  "^17.3.1",
-                         "express":  "^5.2.1",
-                         "express-rate-limit":  "^8.2.1",
-                         "helmet":  "^8.1.0",
-                         "jsonwebtoken":  "^9.0.3",
-                         "mongoose":  "^9.2.1"
-                     },
-    "devDependencies":  {
-                            "nodemon":  "^3.1.11"
-                        }
+{
+  "name": "karibu-groceries-ltd",
+  "version": "1.0.0",
+  "description": "Branch-based wholesale management API for Karibu Groceries (stock, sales, credit, users, and branches).",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "build": "node -e \"console.log('No build step required for this backend service.')\"",
+    "test": "node test/run-tests.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
 }

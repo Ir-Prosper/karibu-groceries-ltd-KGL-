@@ -154,6 +154,33 @@
       </div>
     </div>
 
+    <div id="dashboardFiltersBar" class="table-toolbar dashboard-filters">
+      <div class="filter-row">
+        <select id="stockStatusFilter" class="filter-select" aria-label="Stock status filter">
+          <option value="all">All Stock</option>
+          <option value="in">In Stock</option>
+          <option value="low">Low Stock</option>
+          <option value="out">Out of Stock</option>
+        </select>
+        <select id="creditStatusFilter" class="filter-select" aria-label="Credit status filter">
+          <option value="all">All Credits</option>
+          <option value="pending">Pending</option>
+          <option value="partial">Partial</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <select id="salesDateFilter" class="filter-select" aria-label="Date range filter">
+          <option value="all">All Dates</option>
+          <option value="today">Today</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+        </select>
+        <button type="button" class="filter-reset-btn" id="dashboardFilterReset">
+          <i class="bi bi-arrow-counterclockwise"></i> Reset Filters
+        </button>
+      </div>
+    </div>
+
     <!-- CONTENT AREA -->
     <div class="content-area">
 
@@ -161,7 +188,7 @@
       <section id="dashboardSection" class="content-section">
         
         <!-- Stock Table Title with Print Button -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+        <div id="stockSectionTitle" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
           <h2 class="section-title" style="margin:0;">
             Available Stock — <span id="stockBranch">Matugga</span> Branch
           </h2>
@@ -188,7 +215,7 @@
         </div>
         
         <!-- Recent Credits Table with Print Button -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:15px;">
+        <div id="creditsSectionTitle" style="display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:15px;">
           <h2 class="section-title" style="margin:0;">Recent Credits</h2>
           <button onclick="printCreditsReport()" class="export-btn">
             <i class="bi bi-printer"></i> Print Credits
@@ -214,7 +241,7 @@
         </div>
 
         <!-- Recent Sales Table with Export Button -->
-        <div class="section-header-with-button">
+        <div class="section-header-with-button" id="salesSectionTitle">
           <h2 class="section-title">Recent Sales</h2>
           <button class="export-btn" onclick="exportSalesCSV()">
             <i class="bi bi-download"></i> Export CSV

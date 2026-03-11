@@ -149,7 +149,16 @@ function initDashboardSidebarToggle() {
 
   backdrop.addEventListener('click', closeMobileMenu);
 
-  document.querySelectorAll('.sidebar-nav a[data-page]').forEach((link) => {
+  document.querySelectorAll('.sidebar-nav a').forEach((link) => {
+    let label = link.dataset.label || link.getAttribute('aria-label') || '';
+    if (!label) {
+      label = link.textContent.replace(/\s+/g, ' ').trim();
+    }
+    if (label) {
+      link.dataset.label = label;
+      link.setAttribute('aria-label', label);
+      link.setAttribute('title', label);
+    }
     link.addEventListener('click', () => {
       if (isMobileLayout()) closeMobileMenu();
     });

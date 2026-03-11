@@ -8,6 +8,11 @@
 const LOW=1000;
 const NOTIF_POLL_MS=Number(window.KGL_DASHBOARD_POLL_MS||30000);
 let user=null,allSales=[],allCredits=[],allStock=[],allUsers=[],allBranches=[];
+let paginatedUsers = { users: [], page: 1, pages: 1, total: 0 };
+let paginatedBranches = { branches: [], page: 1, pages: 1, total: 0 };
+let userSummary = { total: 0, active: 0, byRole: {}, byStatus: {}, byBranch: {} };
+const userFilters = { q: '', role: '', branch: '', status: '', page: 1, limit: 10 };
+const branchFilters = { q: '', status: '', page: 1, limit: 10 };
 let notifPollTimer=null;
 const g=(id)=>document.getElementById(id);
 const token=()=>localStorage.getItem('token')||null;
@@ -16,35 +21,257 @@ const money=(n)=>`Ush ${(Number(n)||0).toLocaleString()}`;
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,(ch)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
 const escAttr=(v)=>esc(v).replace(/`/g,'&#96;');
 function t(msg,type='success'){if(typeof showToast==='function')showToast(msg,type);else console.log(msg)}
+const toInt=(v,d)=>{const n=parseInt(v,10);return Number.isNaN(n)?d:n};
+function buildQuery(params){return Object.entries(params).filter(([,v])=>v!==undefined&&v!==null&&String(v).length).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')}
 async function api(url,opt={}){const h={...(opt.headers||{})};const tk=token();if(tk&&!h.Authorization&&!h.authorization)h.Authorization=`Bearer ${tk}`;const r=await fetch(url,{...opt,headers:h});if(r.status===401){localStorage.removeItem('token');localStorage.removeItem('user');window.location.href='../../index.html?reason=session_expired';throw new Error('Session expired')}if(!r.ok){let m=`${r.status} ${r.statusText}`;try{const b=await r.json();if(b?.error)m+=`: ${b.error}`}catch(_){}throw new Error(m)}if(r.status===204)return null;return r.json()}
-function branchNames(){const a=allBranches.map(b=>String(b?.name||'').trim()).filter(Boolean);if(a.length)return a;const u=[...new Set(allUsers.map(x=>String(x?.branch||'').trim()).filter(Boolean))];return u.length?u:['Maganjo','Matugga']}
+function branchNames(){const a=allBranches.map(b=>String(b?.name||'').trim()).filter(Boolean);if(a.length)return a;return['Maganjo','Matugga']}
 function defaultBranchMeta(name){const k=nB(name);if(k==='maganjo')return{contact:'0771234567',email:'maganjo@karibugroceries.com'};if(k==='matugga')return{contact:'0772345678',email:'matugga@karibugroceries.com'};return{contact:'',email:''}}
 function slots(){const b=branchNames();return [b[0]||'Maganjo',b[1]||'Matugga']}
 function set(id,v){const e=g(id);if(e)e.textContent=v}
+let branchStaffMap=new Map();
+function rebuildBranchStaffMap(){
+  branchStaffMap=new Map();
+  if(userSummary?.byBranch){
+    Object.entries(userSummary.byBranch).forEach(([name,info])=>{
+      branchStaffMap.set(nB(name),{total:info.total||0,active:info.active||0});
+    });
+  }
+}
+function getBranchStaffCount(branch){
+  const key=nB(branch);
+  if(branchStaffMap.has(key))return branchStaffMap.get(key).active||0;
+  return allUsers.filter(x=>nB(x.branch)===key&&x.role!=='director'&&(x.status||'active')==='active').length;
+}
 function setupNav(){document.querySelectorAll('.sidebar-nav a[data-page]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll('.sidebar-nav a[data-page]').forEach(x=>x.classList.remove('active'));a.classList.add('active');show(a.getAttribute('data-page'))}))}
-function show(page){const m={overview:'overviewSection',branches:'branchesSection',users:'usersSection',branchManagement:'branchManagementSection',reports:'reportsSection'};document.querySelectorAll('.content-section').forEach(s=>s.style.display='none');const s=g(m[page]||m.overview);if(s)s.style.display=''}
+function show(page){
+  const m={overview:'overviewSection',branches:'branchesSection',users:'usersSection',branchManagement:'branchManagementSection',reports:'reportsSection'};
+  document.querySelectorAll('.content-section').forEach(s=>s.style.display='none');
+  const s=g(m[page]||m.overview);
+  if(s)s.style.display='';
+  const usersFilters=g('directorUsersFiltersBar');
+  const branchFilters=g('directorBranchesFiltersBar');
+  if(usersFilters) usersFilters.style.display = page === 'users' ? 'block' : 'none';
+  if(branchFilters) branchFilters.style.display = page === 'branchManagement' ? 'block' : 'none';
+}
 function setupSearch(){const i=g('dashboardSearch');if(!i)return;const sels=['#recentSalesBody tr','#topProductsBody tr','#maganjoStockBody tr','#matuggaStockBody tr','#maganjoCreditsBody tr','#matuggaCreditsBody tr','#usersTableBody tr','#branchesTableBody tr'];i.addEventListener('input',()=>{const q=i.value.toLowerCase().trim();sels.forEach(s=>document.querySelectorAll(s).forEach(r=>{const no=r.classList.contains('no-results');if(no){r.style.display=q?'none':'';return}r.style.display=r.textContent.toLowerCase().includes(q)?'':'none'}))})}
-async function load(){await Promise.all([loadUsers(),loadBranches()]);await Promise.all([loadSales(),loadCredits(),loadStock()]);stats();salesTbl();topTbl();branchPanels();usersTbl();branchesTbl();notif()}
-async function loadUsers(){try{allUsers=await api(`${API_BASE}/users`)}catch(e){allUsers=[];console.error(e.message)}}
-async function loadBranches(){try{allBranches=await api(`${API_BASE}/branches`)}catch(e){allBranches=[{_id:'1',name:'Maganjo',location:'Kampala',status:'active'},{_id:'2',name:'Matugga',location:'Wakiso',status:'active'}]}}
+async function load(){
+  await Promise.all([
+    loadBranchesAll(),
+    renderUsersAndPagination(1,true),
+    renderBranchesAndPagination(1)
+  ]);
+  await Promise.all([loadSales(),loadCredits(),loadStock()]);
+  stats();
+  salesTbl();
+  topTbl();
+  branchPanels();
+  branchesTbl();
+  notif();
+}
+async function loadUsers(page = 1, limit = 10, includeSummary = false){
+  try{
+    const params={
+      page,
+      limit,
+      q:userFilters.q,
+      role:userFilters.role,
+      branch:userFilters.branch,
+      status:userFilters.status
+    };
+    if(includeSummary)params.summary=1;
+    const qs=buildQuery(params);
+    const data=await api(`${API_BASE}/users?${qs}`);
+    paginatedUsers=data;
+    allUsers=data.users||[];
+    if(data.summary){
+      userSummary=data.summary;
+      rebuildBranchStaffMap();
+    }
+  }catch(e){
+    paginatedUsers={ users: [], page: 1, pages: 1, total: 0 };
+    allUsers=[];
+    console.error(e.message);
+  }
+}
+async function loadBranchesAll(){
+  try{
+    const data=await api(`${API_BASE}/branches?limit=0`);
+    allBranches=data.branches||[];
+  }catch(e){
+    allBranches=[{_id:'1',name:'Maganjo',location:'Kampala',status:'active'},{_id:'2',name:'Matugga',location:'Wakiso',status:'active'}];
+  }
+  syncBranchFilterOptions();
+}
+async function loadBranchesPage(page = 1, limit = 10){
+  try{
+    const params={page,limit,q:branchFilters.q,status:branchFilters.status};
+    const qs=buildQuery(params);
+    const data=await api(`${API_BASE}/branches?${qs}`);
+    paginatedBranches=data;
+  }catch(e){
+    paginatedBranches={ branches: [], page: 1, pages: 1, total: 0 };
+    console.error(e.message);
+  }
+}
 async function loadSales(){try{allSales=(await Promise.all(branchNames().map(b=>api(`${API_BASE}/sales/branch?branch=${encodeURIComponent(b)}`)))).flat()}catch(e){allSales=[];console.error(e.message)}}
 async function loadCredits(){try{allCredits=(await Promise.all(branchNames().map(b=>api(`${API_BASE}/credits/branch?branch=${encodeURIComponent(b)}`)))).flat()}catch(e){allCredits=[];console.error(e.message)}}
 async function loadStock(){try{allStock=(await Promise.all(branchNames().map(async b=>(await api(`${API_BASE}/procurement/available?branch=${encodeURIComponent(b)}`)).map(x=>({...x,branch:x.branch||b}))))).flat()}catch(e){allStock=[];console.error(e.message)}}
-function stats(){set('totalSalesValue',money(allSales.reduce((s,x)=>s+(x.amount_paid_ugx||0),0)));set('totalSalesCount',`${allSales.length} TXNS`);set('totalCreditsValue',money(allCredits.reduce((s,x)=>s+(x.amount_due_ugx||0),0)));set('totalCreditsCount',`${allCredits.length} CREDITS`);const st=allStock.reduce((s,x)=>s+(x.remaining_kg||0),0);set('totalStockValue',`${st.toLocaleString()} kg`);set('totalStockCount',`${allStock.length} PRODUCTS`);const un=allCredits.filter(c=>c.status!=='paid');set('pendingCreditsValue',money(un.reduce((s,c)=>s+((c.amount_due_ugx||0)-(c.amount_paid_ugx||0)),0)));const act=allUsers.filter(u=>(u.status||'active')==='active');set('totalUsersValue',String(act.length));set('totalUsersBreakdown',`${act.filter(u=>u.role==='manager').length}M / ${act.filter(u=>u.role==='sales_agent'||u.role==='agent').length}A`);const td=new Date();td.setHours(0,0,0,0);set('overdueValue',String(un.filter(c=>{if(!c.due_date)return false;const d=new Date(c.due_date);d.setHours(0,0,0,0);return d<td}).length));set('lowStockValue',String(allStock.filter(s=>(s.remaining_kg||0)>0&&(s.remaining_kg||0)<=LOW).length));const [a,b]=slots();bStats(a,'maganjo');bStats(b,'matugga')}
-function bStats(branch,p){const k=nB(branch);const sales=allSales.filter(x=>nB(x.branch)===k);const cr=allCredits.filter(x=>nB(x.branch)===k&&x.status!=='paid');const st=allStock.filter(x=>nB(x.branch)===k);const sf=allUsers.filter(x=>nB(x.branch)===k&&x.role!=='director'&&(x.status||'active')==='active');set(`${p}Sales`,money(sales.reduce((s,x)=>s+(x.amount_paid_ugx||0),0)));set(`${p}Stock`,`${st.reduce((s,x)=>s+(x.remaining_kg||0),0).toLocaleString()} kg`);set(`${p}Credits`,money(cr.reduce((s,x)=>s+((x.amount_due_ugx||0)-(x.amount_paid_ugx||0)),0)));set(`${p}Staff`,String(sf.length))}
+function stats(){
+  set('totalSalesValue',money(allSales.reduce((s,x)=>s+(x.amount_paid_ugx||0),0)));
+  set('totalSalesCount',`${allSales.length} TXNS`);
+  set('totalCreditsValue',money(allCredits.reduce((s,x)=>s+(x.amount_due_ugx||0),0)));
+  set('totalCreditsCount',`${allCredits.length} CREDITS`);
+  const st=allStock.reduce((s,x)=>s+(x.remaining_kg||0),0);
+  set('totalStockValue',`${st.toLocaleString()} kg`);
+  set('totalStockCount',`${allStock.length} PRODUCTS`);
+  const un=allCredits.filter(c=>c.status!=='paid');
+  set('pendingCreditsValue',money(un.reduce((s,c)=>s+((c.amount_due_ugx||0)-(c.amount_paid_ugx||0)),0)));
+  const activeCount=userSummary.active||allUsers.filter(u=>(u.status||'active')==='active').length;
+  const mgrCount=(userSummary.byRole?.manager)||allUsers.filter(u=>u.role==='manager').length;
+  const agentCount=(userSummary.byRole?.sales_agent)||allUsers.filter(u=>u.role==='sales_agent'||u.role==='agent').length;
+  set('totalUsersValue',String(activeCount));
+  set('totalUsersBreakdown',`${mgrCount}M / ${agentCount}A`);
+  const td=new Date();
+  td.setHours(0,0,0,0);
+  set('overdueValue',String(un.filter(c=>{if(!c.due_date)return false;const d=new Date(c.due_date);d.setHours(0,0,0,0);return d<td}).length));
+  set('lowStockValue',String(allStock.filter(s=>(s.remaining_kg||0)>0&&(s.remaining_kg||0)<=LOW).length));
+  const [a,b]=slots();
+  bStats(a,'maganjo');
+  bStats(b,'matugga');
+}
+function bStats(branch,p){
+  const k=nB(branch);
+  const sales=allSales.filter(x=>nB(x.branch)===k);
+  const cr=allCredits.filter(x=>nB(x.branch)===k&&x.status!=='paid');
+  const st=allStock.filter(x=>nB(x.branch)===k);
+  const staff=getBranchStaffCount(branch);
+  set(`${p}Sales`,money(sales.reduce((s,x)=>s+(x.amount_paid_ugx||0),0)));
+  set(`${p}Stock`,`${st.reduce((s,x)=>s+(x.remaining_kg||0),0).toLocaleString()} kg`);
+  set(`${p}Credits`,money(cr.reduce((s,x)=>s+((x.amount_due_ugx||0)-(x.amount_paid_ugx||0)),0)));
+  set(`${p}Staff`,String(staff));
+}
 function salesTbl(){const tb=g('recentSalesBody');if(!tb)return;if(!allSales.length){tb.innerHTML='<tr><td colspan="4" class="no-results">No sales yet</td></tr>';return}const m=new Map();allSales.forEach(s=>{const b=s.branch||'Unknown';const p=m.get(b)||{a:0,t:0,c:0};p.a+=s.amount_paid_ugx||0;p.t+=s.tonnage_kg||0;p.c++;m.set(b,p)});tb.innerHTML=[...m.entries()].sort((x,y)=>y[1].a-x[1].a).map(([b,d])=>`<tr><td>${esc(b)}</td><td>${money(d.a)}</td><td>${d.t.toLocaleString()} kg</td><td>${d.c}</td></tr>`).join('')}
 function topTbl(){const tb=g('topProductsBody');if(!tb)return;const m=new Map();allSales.forEach(s=>{const k=s.produce_name||'Unknown';const p=m.get(k)||{t:0,r:0,c:0};p.t+=s.tonnage_kg||0;p.r+=s.amount_paid_ugx||0;p.c++;m.set(k,p)});const a=[...m.entries()].map(([n,v])=>({n,...v})).sort((x,y)=>y.r-x.r).slice(0,10);if(!a.length){tb.innerHTML='<tr><td colspan="5" class="no-results">No products sold yet</td></tr>';return}tb.innerHTML=a.map((p,i)=>`<tr><td>#${i+1}</td><td>${esc(p.n)}</td><td>${p.t.toLocaleString()} kg</td><td>${money(p.r)}</td><td>${p.c}</td></tr>`).join('')}
 function branchPanels(){const [a,b]=slots();stockPanel(a,'maganjoStockBody');stockPanel(b,'matuggaStockBody');creditPanel(a,'maganjoCreditsBody');creditPanel(b,'matuggaCreditsBody')}
 function stockPanel(branch,id){const tb=g(id);if(!tb)return;const l=allStock.filter(x=>nB(x.branch)===nB(branch));if(!l.length){tb.innerHTML='<tr><td colspan="3" class="no-results">No stock</td></tr>';return}tb.innerHTML=l.map(x=>{const r=x.remaining_kg||0;const rowClass=r<=0?'out-of-stock-row':(r<=LOW?'low-stock-row':'');const tag=r<=0?'<span class="stock-danger">OUT</span>':(r<=LOW?'<span class="stock-warning">LOW</span>':'');return `<tr class="${rowClass}"><td>${esc(x.name||'N/A')}</td><td>${esc(x.type||'N/A')}</td><td>${r.toLocaleString()} kg ${tag}</td></tr>`}).join('')}
 function creditPanel(branch,id){const tb=g(id);if(!tb)return;const l=allCredits.filter(x=>nB(x.branch)===nB(branch));if(!l.length){tb.innerHTML='<tr><td colspan="2" class="no-results">No credits</td></tr>';return}const due=l.reduce((s,c)=>s+(c.amount_due_ugx||0),0),paid=l.reduce((s,c)=>s+(c.amount_paid_ugx||0),0);const td=new Date();td.setHours(0,0,0,0);const ov=l.filter(c=>{if(!c.due_date)return false;const d=new Date(c.due_date);d.setHours(0,0,0,0);return d<td&&c.status!=='paid'}).length;const paidLate=l.filter(c=>{if(!c.due_date||c.status!=='paid')return false;const d=new Date(c.due_date);d.setHours(0,0,0,0);return d<td}).length;tb.innerHTML=`<tr><td>Total Credits</td><td>${l.length}</td></tr><tr><td>Outstanding Balance</td><td>${money(Math.max(0,due-paid))}</td></tr><tr><td>Total Collected</td><td>${money(paid)}</td></tr><tr><td>Overdue Credits</td><td>${ov}</td></tr><tr><td>Paid Late</td><td>${paidLate}</td></tr>`}
-function usersTbl(){const tb=g('usersTableBody');if(!tb)return;if(!allUsers.length){tb.innerHTML='<tr><td colspan="6" class="no-results">No users found</td></tr>';return}tb.innerHTML=[...allUsers].sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''))).map(u=>{const active=(u.status||'active')==='active';const st=active?'<span class="status-active">Active</span>':'<span class="status-inactive">Inactive</span>';const role=u.role==='sales_agent'||u.role==='agent'?'Sales Agent':(u.role==='manager'?'Manager':'Director');const br=u.role==='director'?'All Branches':(u.branch||'N/A');const isDirector=u.role==='director';const safeId=escAttr(u._id);const actions=isDirector?'<span class="table-action-lock"><i class="bi bi-lock-fill"></i> Protected Director</span>':`<span class="table-actions"><button class="table-action-btn action-edit" onclick="openEditUserModal('${safeId}')">Edit</button><button class="table-action-btn ${active?'action-warn':'action-success'}" onclick="toggleUserStatus('${safeId}')">${active?'Deactivate':'Activate'}</button><button class="table-action-btn action-danger" onclick="deleteUser('${safeId}')">Delete</button></span>`;return `<tr><td>${esc(u.full_name||'N/A')}</td><td>${esc(u.email||'N/A')}</td><td>${role}</td><td>${esc(br)}</td><td>${st}</td><td>${actions}</td></tr>`}).join('')}
-function branchesTbl(){const tb=g('branchesTableBody');if(!tb)return;if(!allBranches.length){tb.innerHTML='<tr><td colspan="7" class="no-results">No branches found</td></tr>';return}tb.innerHTML=allBranches.map(b=>{const a=(b.status||'active')==='active';const st=a?'<span class="status-active">Active</span>':'<span class="status-inactive">Inactive</span>';const staff=allUsers.filter(u=>nB(u.branch)===nB(b.name)&&u.role!=='director').length;const isDefault=nB(b.name)==='maganjo'||nB(b.name)==='matugga';const meta=defaultBranchMeta(b.name);const contact=(b.contact&&String(b.contact).trim())||meta.contact||'N/A';const email=(b.email&&String(b.email).trim())||meta.email||'N/A';const safeId=escAttr(b._id);const edit=`<button class="table-action-btn action-edit" onclick="openEditBranchModal('${safeId}')">Edit</button>`;const toggle=`<button class="table-action-btn ${a?'action-warn':'action-success'}" onclick="toggleBranchStatus('${safeId}')">${a?'Deactivate':'Activate'}</button>`;const del=isDefault?'<span class="table-action-note">Default</span>':`<button class="table-action-btn action-danger" onclick="deleteBranch('${safeId}')">Delete</button>`;return `<tr><td>${esc(b.name||'N/A')}</td><td>${esc(b.location||'N/A')}</td><td>${esc(contact)}</td><td>${esc(email)}</td><td>${st}</td><td>${staff}</td><td class="table-actions">${edit} ${toggle} ${del}</td></tr>`}).join('')}
+function usersTbl(){const tb=g('usersTableBody');if(!tb)return;const rows=paginatedUsers.users||[];if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="no-results">No users found</td></tr>';return}tb.innerHTML=[...rows].sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''))).map(u=>{const active=(u.status||'active')==='active';const st=active?'<span class="status-active">Active</span>':'<span class="status-inactive">Inactive</span>';const role=u.role==='sales_agent'||u.role==='agent'?'Sales Agent':(u.role==='manager'?'Manager':'Director');const br=u.role==='director'?'All Branches':(u.branch||'N/A');const isDirector=u.role==='director';const safeId=escAttr(u._id);const actions=isDirector?'<span class="table-action-lock"><i class="bi bi-lock-fill"></i> Protected Director</span>':`<span class="table-actions"><button class="table-action-btn action-edit" onclick="openEditUserModal('${safeId}')">Edit</button><button class="table-action-btn ${active?'action-warn':'action-success'}" onclick="toggleUserStatus('${safeId}')">${active?'Deactivate':'Activate'}</button><button class="table-action-btn action-danger" onclick="deleteUser('${safeId}')">Delete</button></span>`;return `<tr><td>${esc(u.full_name||'N/A')}</td><td>${esc(u.email||'N/A')}</td><td>${role}</td><td>${esc(br)}</td><td>${st}</td><td>${actions}</td></tr>`}).join('')}
+function branchesTbl(){const tb=g('branchesTableBody');if(!tb)return;const rows=paginatedBranches.branches||[];if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="no-results">No branches found</td></tr>';return}tb.innerHTML=rows.map(b=>{const a=(b.status||'active')==='active';const st=a?'<span class="status-active">Active</span>':'<span class="status-inactive">Inactive</span>';const staff=getBranchStaffCount(b.name);const isDefault=nB(b.name)==='maganjo'||nB(b.name)==='matugga';const meta=defaultBranchMeta(b.name);const contact=(b.contact&&String(b.contact).trim())||meta.contact||'N/A';const email=(b.email&&String(b.email).trim())||meta.email||'N/A';const safeId=escAttr(b._id);const edit=`<button class="table-action-btn action-edit" onclick="openEditBranchModal('${safeId}')">Edit</button>`;const toggle=`<button class="table-action-btn ${a?'action-warn':'action-success'}" onclick="toggleBranchStatus('${safeId}')">${a?'Deactivate':'Activate'}</button>`;const del=isDefault?'<span class="table-action-note">Default</span>':`<button class="table-action-btn action-danger" onclick="deleteBranch('${safeId}')">Delete</button>`;return `<tr><td>${esc(b.name||'N/A')}</td><td>${esc(b.location||'N/A')}</td><td>${esc(contact)}</td><td>${esc(email)}</td><td>${st}</td><td>${staff}</td><td class="table-actions">${edit} ${toggle} ${del}</td></tr>`}).join('')}
+function renderPagination(containerId,page,pages,total,onPage){
+  const el=g(containerId);if(!el)return;
+  if(pages<=1){el.innerHTML=total?`<span class="pagination-info">Total: ${total}</span>`:'';return}
+  const btn=(label,p,disabled,active)=>`<button ${disabled?'disabled':''} class="${active?'active':''}" data-page="${p}">${label}</button>`;
+  const prev=Math.max(1,page-1),next=Math.min(pages,page+1);
+  const start=Math.max(1,page-2),end=Math.min(pages,page+2);
+  const nums=[];for(let i=start;i<=end;i++)nums.push(btn(i,i,false,i===page));
+  el.innerHTML=`${btn('Prev',prev,page===1,false)}${nums.join('')}${btn('Next',next,page===pages,false)}<span class="pagination-info">Page ${page} of ${pages} • ${total} total</span>`;
+  el.querySelectorAll('button[data-page]').forEach(b=>{b.addEventListener('click',()=>{const p=toInt(b.dataset.page,page);if(p!==page)onPage(p)})});
+}
+function syncBranchFilterOptions(){
+  const select=g('userBranchFilter');if(!select)return;
+  const current=select.value;
+  const options=['<option value="">All Branches</option>'].concat(branchNames().map(b=>`<option value="${escAttr(b)}">${esc(b)}</option>`));
+  select.innerHTML=options.join('');
+  if(current)select.value=current;
+}
+function applyUserFiltersFromInputs(){
+  userFilters.q=g('userSearchInput')?.value?.trim()||'';
+  userFilters.role=g('userRoleFilter')?.value||'';
+  userFilters.branch=g('userBranchFilter')?.value||'';
+  userFilters.status=g('userStatusFilter')?.value||'';
+  userFilters.limit=toInt(g('userPageSize')?.value,10)||10;
+}
+function applyBranchFiltersFromInputs(){
+  branchFilters.q=g('branchSearchInput')?.value?.trim()||'';
+  branchFilters.status=g('branchStatusFilter')?.value||'';
+  branchFilters.limit=toInt(g('branchPageSize')?.value,10)||10;
+}
+async function renderUsersAndPagination(page=1,includeSummary=false){
+  applyUserFiltersFromInputs();
+  userFilters.page=page;
+  await loadUsers(userFilters.page,userFilters.limit,includeSummary);
+  usersTbl();
+  renderPagination('usersPagination',paginatedUsers.page,paginatedUsers.pages,paginatedUsers.total,(p)=>renderUsersAndPagination(p));
+}
+async function renderBranchesAndPagination(page=1){
+  applyBranchFiltersFromInputs();
+  branchFilters.page=page;
+  await loadBranchesPage(branchFilters.page,branchFilters.limit);
+  branchesTbl();
+  renderPagination('branchesPagination',paginatedBranches.page,paginatedBranches.pages,paginatedBranches.total,(p)=>renderBranchesAndPagination(p));
+}
+function setupFilters(){
+  const wireInput=(id,cb)=>{const el=g(id);if(!el||el.dataset.wired==='1')return;el.dataset.wired='1';el.addEventListener('input',cb);el.addEventListener('change',cb)}
+  let userTimer=null;
+  wireInput('userSearchInput',()=>{clearTimeout(userTimer);userTimer=setTimeout(()=>{renderUsersAndPagination(1,true);scrollToSection('usersSection')},250)});
+  ['userRoleFilter','userBranchFilter','userStatusFilter','userPageSize'].forEach(id=>wireInput(id,()=>{renderUsersAndPagination(1,true);scrollToSection('usersSection')}));
+  let branchTimer=null;
+  wireInput('branchSearchInput',()=>{clearTimeout(branchTimer);branchTimer=setTimeout(()=>{renderBranchesAndPagination(1);scrollToSection('branchManagementSection')},250)});
+  ['branchStatusFilter','branchPageSize'].forEach(id=>wireInput(id,()=>{renderBranchesAndPagination(1);scrollToSection('branchManagementSection')}));
+}
+
+function scrollToSection(id){
+  const scroller=document.querySelector('.content-area');
+  const target=g(id);
+  if(!scroller||!target)return;
+  const top=target.offsetTop-12;
+  scroller.scrollTo({top:Math.max(top,0),behavior:'smooth'});
+}
 function closeUserModal(){document.getElementById("userModal")?.remove()}
 async function openAddUserModal(){closeUserModal();const opts=branchNames().map(b=>`<option value="${escAttr(b)}">${esc(b)}</option>`).join('');document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="userModal" style="z-index:10000;"><div class="confirm-box user-modal-box"><h3>Add User</h3><form id="userForm" class="user-modal-form"><div class="form-group"><label for="userFullName">Full Name</label><input id="userFullName" placeholder="Full name" required></div><div class="form-group"><label for="userEmail">Email</label><input id="userEmail" type="email" placeholder="Email" required></div><div class="form-group"><label for="userPassword">Password</label><input id="userPassword" type="password" placeholder="Password" required></div><div class="form-group"><label for="userRoleSelect">Role</label><select id="userRoleSelect" required><option value="manager">Manager</option><option value="sales_agent">Sales Agent</option></select></div><div class="form-group"><label for="userBranchSelect">Branch</label><select id="userBranchSelect" required>${opts}</select></div><div id="formError" class="user-form-error"></div><div class="form-actions"><button type="button" class="btn-cancel" onclick="closeUserModal()">Cancel</button><button type="submit" class="btn-primary">Create</button></div></form></div></div>`);document.getElementById('userForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const full_name=g('userFullName')?.value?.trim();const email=g('userEmail')?.value?.trim();const password=g('userPassword')?.value||'';const role=g('userRoleSelect')?.value;const branch=g('userBranchSelect')?.value;try{await api(`${API_BASE}/users`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({full_name,email,password,role,branch})});closeUserModal();t('User created successfully','success');await load()}catch(err){const e1=g('formError');if(e1)e1.textContent=err.message;t(err.message,'error');}})}
-async function openEditUserModal(id){const u=allUsers.find(x=>String(x._id)===String(id));if(!u)return;if(u.role==='director'){t('Director account is protected and cannot be edited.','error');return}closeUserModal();const opts=branchNames().map(b=>`<option value="${escAttr(b)}" ${u.branch===b?'selected':''}>${esc(b)}</option>`).join('');document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="userModal" style="z-index:10000;"><div class="confirm-box user-modal-box"><h3>Edit User</h3><form id="userForm" class="user-modal-form"><div class="form-group"><label for="userFullName">Full Name</label><input id="userFullName" value="${escAttr(u.full_name||'')}" required></div><div class="form-group"><label for="userEmail">Email</label><input id="userEmail" type="email" value="${escAttr(u.email||'')}" required></div><div class="form-group"><label for="userPassword">Password (Optional)</label><input id="userPassword" type="password" placeholder="Leave blank to keep current password"></div><div class="form-group"><label for="userRoleSelect">Role</label><select id="userRoleSelect" required><option value="manager" ${u.role==='manager'?'selected':''}>Manager</option><option value="sales_agent" ${(u.role==='sales_agent'||u.role==='agent')?'selected':''}>Sales Agent</option></select></div><div class="form-group"><label for="userBranchSelect">Branch</label><select id="userBranchSelect" required>${opts}</select></div><div id="formError" class="user-form-error"></div><div class="form-actions"><button type="button" class="btn-cancel" onclick="closeUserModal()">Cancel</button><button type="submit" class="btn-primary">Save</button></div></form></div></div>`);document.getElementById('userForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const full_name=g('userFullName')?.value?.trim();const email=g('userEmail')?.value?.trim();const password=g('userPassword')?.value||'';const role=g('userRoleSelect')?.value;const branch=g('userBranchSelect')?.value;const body={full_name,email,role,branch};if(password)body.password=password;try{await api(`${API_BASE}/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});closeUserModal();t('User updated successfully','success');await load()}catch(err){const e1=g('formError');if(e1)e1.textContent=err.message;t(err.message,'error');}})}
-async function toggleUserStatus(id){const u=allUsers.find(x=>String(x._id)===String(id));if(!u)return;if(u.role==='director'){t('Director account is protected and cannot be deactivated.','error');return}const status=(u.status||'active')==='active'?'inactive':'active';try{await api(`${API_BASE}/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});t(`User ${status==='inactive'?'deactivated':'activated'} successfully`,'success');await load()}catch(e){t(e.message,'error')}}
+async function openEditUserModal(id){
+  const u = await api(`${API_BASE}/users/${id}`);
+  if(!u)return;
+  if(u.role==='director'){t('Director account is protected and cannot be edited.','error');return}
+  closeUserModal();
+  const opts=branchNames().map(b=>`<option value="${escAttr(b)}" ${u.branch===b?'selected':''}>${esc(b)}</option>`).join('');
+  document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="userModal" style="z-index:10000;"><div class="confirm-box user-modal-box"><h3>Edit User</h3><form id="userForm" class="user-modal-form"><div class="form-group"><label for="userFullName">Full Name</label><input id="userFullName" value="${escAttr(u.full_name||'')}" required></div><div class="form-group"><label for="userEmail">Email</label><input id="userEmail" type="email" value="${escAttr(u.email||'')}" required></div><div class="form-group"><label for="userPassword">Password (Optional)</label><input id="userPassword" type="password" placeholder="Leave blank to keep current password"></div><div class="form-group"><label for="userRoleSelect">Role</label><select id="userRoleSelect" required><option value="manager" ${u.role==='manager'?'selected':''}>Manager</option><option value="sales_agent" ${(u.role==='sales_agent'||u.role==='agent')?'selected':''}>Sales Agent</option></select></div><div class="form-group"><label for="userBranchSelect">Branch</label><select id="userBranchSelect" required>${opts}</select></div><div id="formError" class="user-form-error"></div><div class="form-actions"><button type="button" class="btn-cancel" onclick="closeUserModal()">Cancel</button><button type="submit" class="btn-primary">Save</button></div></form></div></div>`);
+  document.getElementById('userForm')?.addEventListener('submit',async(e)=>{
+    e.preventDefault();
+    const full_name=g('userFullName')?.value?.trim();
+    const email=g('userEmail')?.value?.trim();
+    const password=g('userPassword')?.value||'';
+    const role=g('userRoleSelect')?.value;
+    const branch=g('userBranchSelect')?.value;
+    const body = { full_name, email, role, branch };
+    if (password) {
+      body.password = password;
+    }
+    try {
+      await api(`${API_BASE}/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      closeUserModal();
+      t('User updated successfully','success');
+      await renderUsersAndPagination(paginatedUsers.page,true);
+    }catch(err){
+      const e1=g('formError');
+      if(e1)e1.textContent=err.message;
+      t(err.message,'error');
+    }
+  });
+}
+async function toggleUserStatus(id){
+  const u = await api(`${API_BASE}/users/${id}`);
+  if(!u)return;
+  if(u.role==='director'){t('Director account is protected and cannot be deactivated.','error');return}
+  const status=(u.status||'active')==='active'?'inactive':'active';
+  try{
+    await api(`${API_BASE}/users/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+    t(`User ${status==='inactive'?'deactivated':'activated'} successfully`,'success');
+    await renderUsersAndPagination(paginatedUsers.page,true);
+  }catch(e){
+    t(e.message,'error')
+  }
+}
 let pendingUserDeleteId=null;
-function showDeleteUserConfirm(id){const u=allUsers.find(x=>String(x._id)===String(id));if(!u)return;if(u.role==='director'){t('Director account is protected and cannot be deleted.','error');return}pendingUserDeleteId=id;const m='deleteUserConfirm';document.getElementById(m)?.remove();document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="${m}" style="z-index:10000;"><div class="confirm-dialog"><i class="bi bi-exclamation-triangle-fill"></i><h3>Delete User</h3><p>Are you sure you want to delete <strong>${esc(u.full_name||u.email)}</strong>?</p><div class="confirm-actions"><button class="confirm-btn no" onclick="hideDeleteUserConfirm()">No, Keep</button><button class="confirm-btn yes" onclick="confirmDeleteUser()">Yes, Delete</button></div></div></div>`)}
+async function showDeleteUserConfirm(id){
+  const u = await api(`${API_BASE}/users/${id}`);
+  if(!u)return;
+  if(u.role==='director'){t('Director account is protected and cannot be deleted.','error');return}
+  pendingUserDeleteId=id;
+  const m='deleteUserConfirm';
+  document.getElementById(m)?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="${m}" style="z-index:10000;"><div class="confirm-dialog"><i class="bi bi-exclamation-triangle-fill"></i><h3>Delete User</h3><p>Are you sure you want to delete <strong>${esc(u.full_name||u.email)}</strong>?</p><div class="confirm-actions"><button class="confirm-btn no" onclick="hideDeleteUserConfirm()">No, Keep</button><button class="confirm-btn yes" onclick="confirmDeleteUser()">Yes, Delete</button></div></div></div>`);
+}
 function hideDeleteUserConfirm(){document.getElementById('deleteUserConfirm')?.remove();pendingUserDeleteId=null}
 async function confirmDeleteUser(){if(!pendingUserDeleteId)return;const id=pendingUserDeleteId;hideDeleteUserConfirm();try{await api(`${API_BASE}/users/${id}`,{method:'DELETE'});t('User deleted successfully','success');await load()}catch(e){t(e.message,'error')}}
 function deleteUser(id){showDeleteUserConfirm(id)}
@@ -85,8 +312,19 @@ function dl(name,text){const b=new Blob([text],{type:'text/csv;charset=utf-8;'})
 function exportAllSales(){const m=new Map();allSales.forEach(s=>{const b=s.branch||'Unknown';const p=m.get(b)||{a:0,t:0,c:0};p.a+=s.amount_paid_ugx||0;p.t+=s.tonnage_kg||0;p.c++;m.set(b,p)});const rows=[['Branch','Total Sales (UGX)','Total Tonnage (KG)','Transactions']];[...m.entries()].forEach(([b,d])=>rows.push([b,d.a,d.t,d.c]));dl(`all_sales_${new Date().toISOString().split('T')[0]}.csv`,csv(rows));t('Sales report exported successfully','success')}
 function exportAllCredits(){const rows=[['Branch','Total Credits','Outstanding Balance (UGX)','Overdue Count']];branchNames().forEach(name=>{const l=allCredits.filter(c=>nB(c.branch)===nB(name));const due=l.reduce((s,c)=>s+(c.amount_due_ugx||0),0),paid=l.reduce((s,c)=>s+(c.amount_paid_ugx||0),0);const td=new Date();td.setHours(0,0,0,0);const ov=l.filter(c=>{if(!c.due_date)return false;const d=new Date(c.due_date);d.setHours(0,0,0,0);return d<td&&c.status!=='paid'}).length;rows.push([name,l.length,Math.max(0,due-paid),ov])});dl(`all_credits_${new Date().toISOString().split('T')[0]}.csv`,csv(rows));t('Credits report exported successfully','success')}
 function exportAllStock(){const rows=[['Branch','Product','Type','Remaining (KG)','Price To Sell']];allStock.forEach(s=>rows.push([s.branch||'N/A',s.name||'N/A',s.type||'N/A',s.remaining_kg||0,s.price_to_sell||0]));dl(`all_stock_${new Date().toISOString().split('T')[0]}.csv`,csv(rows));t('Stock report exported successfully','success')}
-function exportUsers(){const rows=[['Name','Email','Role','Branch','Status']];allUsers.forEach(u=>rows.push([u.full_name||'',u.email||'',u.role||'',u.branch||'All Branches',u.status||'active']));dl(`users_${new Date().toISOString().split('T')[0]}.csv`,csv(rows));t('Users report exported successfully','success')}
-function printComprehensiveReport(){const w=window.open('','_blank');if(!w){t('Unable to open print window. Please allow pop-ups.','error');return}w.document.write(`<html><body><h1>Karibu Groceries LTD - Comprehensive Report</h1><p>Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="8" cellspacing="0"><tr><td>Total Sales</td><td>${money(allSales.reduce((s,x)=>s+(x.amount_paid_ugx||0),0))}</td></tr><tr><td>Total Credits</td><td>${money(allCredits.reduce((s,x)=>s+(x.amount_due_ugx||0),0))}</td></tr><tr><td>Total Stock</td><td>${allStock.reduce((s,x)=>s+(x.remaining_kg||0),0).toLocaleString()} kg</td></tr><tr><td>Active Users</td><td>${allUsers.filter(u=>(u.status||'active')==='active').length}</td></tr></table></body></html>`);w.document.close();w.focus();w.print();t('Comprehensive report sent to printer','success')}
+async function exportUsers(){
+  try{
+    const data=await api(`${API_BASE}/users?limit=0`);
+    const users=data.users||[];
+    const rows=[['Name','Email','Role','Branch','Status']];
+    users.forEach(u=>rows.push([u.full_name||'',u.email||'',u.role||'',u.branch||'All Branches',u.status||'active']));
+    dl(`users_${new Date().toISOString().split('T')[0]}.csv`,csv(rows));
+    t('Users report exported successfully','success');
+  }catch(e){
+    t(e.message,'error');
+  }
+}
+function printComprehensiveReport(){const w=window.open('','_blank');if(!w){t('Unable to open print window. Please allow pop-ups.','error');return}const activeCount=userSummary.active||allUsers.filter(u=>(u.status||'active')==='active').length;w.document.write(`<html><body><h1>Karibu Groceries LTD - Comprehensive Report</h1><p>Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="8" cellspacing="0"><tr><td>Total Sales</td><td>${money(allSales.reduce((s,x)=>s+(x.amount_paid_ugx||0),0))}</td></tr><tr><td>Total Credits</td><td>${money(allCredits.reduce((s,x)=>s+(x.amount_due_ugx||0),0))}</td></tr><tr><td>Total Stock</td><td>${allStock.reduce((s,x)=>s+(x.remaining_kg||0),0).toLocaleString()} kg</td></tr><tr><td>Active Users</td><td>${activeCount}</td></tr></table></body></html>`);w.document.close();w.focus();w.print();t('Comprehensive report sent to printer','success')}
 function printPerformanceReport(){const rows=branchNames().map(name=>{const s=allSales.filter(x=>nB(x.branch)===nB(name));return `<tr><td>${esc(name)}</td><td>${money(s.reduce((a,b)=>a+(b.amount_paid_ugx||0),0))}</td><td>${s.length}</td></tr>`}).join('');const w=window.open('','_blank');if(!w){t('Unable to open print window. Please allow pop-ups.','error');return}w.document.write(`<html><body><h1>Karibu Groceries LTD - Performance Summary</h1><p>Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="8" cellspacing="0"><tr><th>Branch</th><th>Total Sales</th><th>Transactions</th></tr>${rows}</table></body></html>`);w.document.close();w.focus();w.print();t('Performance report sent to printer','success')}
 function getDirectorAlerts(){const low=allStock.filter(s=>(s.remaining_kg||0)>0&&(s.remaining_kg||0)<=LOW);const out=allStock.filter(s=>(s.remaining_kg||0)<=0);const td=new Date();td.setHours(0,0,0,0);const overdue=allCredits.filter(c=>{if(!c.due_date||c.status==='paid')return false;const d=new Date(c.due_date);d.setHours(0,0,0,0);return d<td});return{low,out,overdue}}
 function updateNotifBadge(count){const b=document.querySelector('.notif-icon .badge');const bell=document.querySelector('.notif-icon');if(!b||!bell)return;if(count>0){b.textContent=String(count);b.style.display='inline';bell.classList.add('has-notification')}else{b.textContent='0';b.style.display='none';bell.classList.remove('has-notification')}}
@@ -94,7 +332,29 @@ function notif(){const a=getDirectorAlerts();updateNotifBadge(a.low.length+a.out
 function closeAlertsPanel(){document.getElementById('alertsModal')?.remove()}
 function showAlertsPanel(low,out,overdue){const ex=document.getElementById('alertsModal');if(ex)ex.remove();document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="alertsModal" style="z-index:10000;"><div class="confirm-dialog" style="text-align:left;max-width:560px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3 style="color:#dc2626;margin:0;display:flex;align-items:center;gap:8px;"><i class="bi bi-bell-fill"></i> Alerts (${low.length+out.length+overdue.length})</h3><button onclick="closeAlertsPanel()" style="background:#f1f5f9;border:none;border-radius:50%;width:32px;height:32px;font-size:1.3rem;cursor:pointer;color:#374151;line-height:1;">&times;</button></div>${low.length?`<div style="margin-bottom:16px;"><h4 style="color:#f59e0b;margin-bottom:8px;font-size:0.95rem;"><i class="bi bi-exclamation-triangle-fill"></i> Low Stock - ${low.length}</h4><div class="alert-list">${low.map(i=>`<div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;"><span>${esc(i.name)} <small style="color:#64748b;">(${esc(i.branch||'N/A')})</small></span><span style="font-weight:700;color:#f59e0b;">${(i.remaining_kg||0).toLocaleString()} kg</span></div>`).join('')}</div></div>`:''}${out.length?`<div style="margin-bottom:16px;"><h4 style="color:#dc2626;margin-bottom:8px;font-size:0.95rem;"><i class="bi bi-x-circle-fill"></i> Out of Stock - ${out.length}</h4><div class="alert-list">${out.map(i=>`<div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;"><span>${esc(i.name)} <small style="color:#64748b;">(${esc(i.branch||'N/A')})</small></span><span style="font-weight:700;color:#dc2626;">0 kg</span></div>`).join('')}</div></div>`:''}${overdue.length?`<div style="margin-bottom:16px;"><h4 style="color:#b45309;margin-bottom:8px;font-size:0.95rem;"><i class="bi bi-clock-history"></i> Overdue Credits - ${overdue.length}</h4><div class="alert-list">${overdue.map(c=>`<div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;"><span>${esc(c.buyer_name||'Unknown')} <small style="color:#64748b;">(${esc(c.branch||'N/A')})</small></span><span style="font-weight:700;color:#b45309;">${money((c.amount_due_ugx||0)-(c.amount_paid_ugx||0))}</span></div>`).join('')}</div></div>`:''}<div style="margin-top:12px;text-align:center;"><button class="btn-primary" onclick="closeAlertsPanel()" style="padding:8px 24px;">Close</button></div></div></div>`)}
 function setupNotificationBell(){const bell=document.querySelector('.notif-icon');if(!bell||bell.dataset.wired==='1')return;bell.dataset.wired='1';bell.addEventListener('click',()=>{const a=getDirectorAlerts();const total=a.low.length+a.out.length+a.overdue.length;if(total===0){t('All stock and credit alerts are healthy','success');return}showAlertsPanel(a.low,a.out,a.overdue)})}
-async function refreshNotifications(){await Promise.all([loadSales(),loadCredits(),loadStock(),loadUsers(),loadBranches()]);stats();salesTbl();topTbl();branchPanels();usersTbl();branchesTbl();notif();if(document.getElementById('alertsModal')){const a=getDirectorAlerts();showAlertsPanel(a.low,a.out,a.overdue)}}
+async function refreshNotifications(){
+  await Promise.all([
+    loadSales(),
+    loadCredits(),
+    loadStock(),
+    loadUsers(userFilters.page,userFilters.limit,true),
+    loadBranchesAll(),
+    loadBranchesPage(branchFilters.page,branchFilters.limit)
+  ]);
+  stats();
+  salesTbl();
+  topTbl();
+  branchPanels();
+  usersTbl();
+  branchesTbl();
+  renderPagination('usersPagination',paginatedUsers.page,paginatedUsers.pages,paginatedUsers.total,(p)=>renderUsersAndPagination(p));
+  renderPagination('branchesPagination',paginatedBranches.page,paginatedBranches.pages,paginatedBranches.total,(p)=>renderBranchesAndPagination(p));
+  notif();
+  if(document.getElementById('alertsModal')){
+    const a=getDirectorAlerts();
+    showAlertsPanel(a.low,a.out,a.overdue);
+  }
+}
 function startNotifPolling(){if(notifPollTimer)clearInterval(notifPollTimer);notifPollTimer=setInterval(()=>{refreshNotifications().catch(e=>console.error(e.message))},NOTIF_POLL_MS)}
 function showLogoutConfirm(e){if(e)e.preventDefault();const id='logoutConfirm';document.getElementById(id)?.remove();document.body.insertAdjacentHTML('beforeend',`<div class="custom-confirm" id="${id}" style="z-index:10000;"><div class="confirm-dialog"><i class="bi bi-box-arrow-right"></i><h3>Logout from Karibu Groceries?</h3><p>Are you sure you want to logout?</p><div class="confirm-actions"><button class="confirm-btn no" onclick="hideLogoutConfirm()">No, Stay</button><button class="confirm-btn yes" onclick="confirmLogout()">Yes, Logout</button></div></div></div>`)}
 function hideLogoutConfirm(){document.getElementById('logoutConfirm')?.remove()}
@@ -104,7 +364,21 @@ window.openAddBranchModal=openAddBranchModal;window.openEditBranchModal=openEdit
 window.exportAllSales=exportAllSales;window.exportAllCredits=exportAllCredits;window.exportAllStock=exportAllStock;window.exportUsers=exportUsers;window.printComprehensiveReport=printComprehensiveReport;window.printPerformanceReport=printPerformanceReport;
 window.showLogoutConfirm=showLogoutConfirm;window.hideLogoutConfirm=hideLogoutConfirm;window.confirmLogout=confirmLogout;
 window.closeAlertsPanel=closeAlertsPanel;
-document.addEventListener('DOMContentLoaded',async()=>{user=JSON.parse(localStorage.getItem('user')||'null');if(!user||user.role!=='director'){window.location.href='../../index.html';return}set('userName',user.full_name||'Director');set('userRole','director');setupNav();setupSearch();setupNotificationBell();g('logoutBtn')?.addEventListener('click',showLogoutConfirm);await load();startNotifPolling();show('overview')});
+document.addEventListener('DOMContentLoaded',async()=>{
+  user=JSON.parse(localStorage.getItem('user')||'null');
+  if(!user||user.role!=='director'){window.location.href='../../index.html';return}
+  set('userName',user.full_name||'Director');
+  set('userRole','director');
+  setupNav();
+  setupSearch();
+  setupFilters();
+  setupNotificationBell();
+  g('logoutBtn')?.addEventListener('click',showLogoutConfirm);
+  await load();
+  startNotifPolling();
+  show('overview');
+});
+
 
 
 

@@ -21,6 +21,11 @@ function hasUnsafeHtmlChars(value) {
   return UNSAFE_HTML_PATTERN.test(String(value || ''));
 }
 
+function clampNumber(value, min, max) {
+  if (Number.isNaN(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
 // Ensure default branches exist once DB is available.
 async function ensureDefaultBranches() {
   const defaults = [
@@ -71,9 +76,58 @@ async function ensureDefaultBranches() {
 router.get('/', verifyToken, allowRoles('director'), async (req, res) => {
   try {
     await ensureDefaultBranches();
-    const branches = await Branch.find().sort({ createdAt: 1 });
+    const page = clampNumber(parseInt(req.query.page, 10) || 1, 1, 100000);
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = Number.isNaN(rawLimit) ? 20 : rawLimit;
+
+    const query = {};
+    const search = String(req.query.q || '').trim();
+    const statusParam = String(req.query.status || '').trim().toLowerCase();
+
+    if (search) {
+      const matcher = new RegExp(escapeRegex(search), 'i');
+      query.$or = [
+        { name: matcher },
+        { location: matcher },
+        { contact: matcher },
+        { email: matcher },
+        { manager: matcher }
+      ];
+    }
+
+    if (statusParam) {
+      query.status = statusParam;
+    }
+
+    if (limit === 0) {
+      const branches = await Branch.find(query).sort({ name: 1, createdAt: 1 });
+      console.log(`[BRANCHES GET] Returning ${branches.length} branches (all)`);
+      return res.json({
+        branches,
+        total: branches.length,
+        page: 1,
+        pages: 1
+      });
+    }
+
+    const safeLimit = clampNumber(limit, 1, 200);
+    const skip = (page - 1) * safeLimit;
+
+    const [branches, totalBranches] = await Promise.all([
+      Branch.find(query)
+        .sort({ name: 1, createdAt: 1 })
+        .skip(skip)
+        .limit(safeLimit),
+      Branch.countDocuments(query)
+    ]);
+
     console.log(`[BRANCHES GET] Returning ${branches.length} branches`);
-    res.json(branches);
+    return res.json({
+      branches,
+      total: totalBranches,
+      page,
+      pages: Math.ceil(totalBranches / safeLimit)
+    });
   } catch (err) {
     console.error('[BRANCHES GET ERROR]', err);
     res.status(500).json({ error: err.message });

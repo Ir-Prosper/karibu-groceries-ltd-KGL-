@@ -89,7 +89,7 @@
             <input
               type="text"
               id="tableSearch"
-              placeholder="Search by name, type, quantity..."
+              placeholder="Search stock, buyers, credits..."
               class="search-bar"
               aria-label="Search stock"
             />
@@ -191,6 +191,33 @@
 
       </div><!-- /stats-row -->
 
+      <div id="dashboardFiltersBar" class="table-toolbar dashboard-filters">
+        <div class="filter-row">
+          <select id="stockStatusFilter" class="filter-select" aria-label="Stock status filter">
+            <option value="all">All Stock</option>
+            <option value="in">In Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
+          <select id="creditStatusFilter" class="filter-select" aria-label="Credit status filter">
+            <option value="all">All Credits</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+          </select>
+          <select id="salesDateFilter" class="filter-select" aria-label="Date range filter">
+            <option value="all">All Dates</option>
+            <option value="today">Today</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+          <button type="button" class="filter-reset-btn" id="dashboardFilterReset">
+            <i class="bi bi-arrow-counterclockwise"></i> Reset Filters
+          </button>
+        </div>
+      </div>
+
       <!-- ============================================================
            SCROLLABLE CONTENT AREA
            Sections are toggled by showSection() in sales.js
@@ -203,7 +230,7 @@
         <div id="dashboardSection" class="content-section">
 
           <!-- Available Stock Table -->
-          <h2 class="section-title">
+          <h2 class="section-title" id="stockSectionTitle">
             Available Stock — <span id="stockBranch">Branch</span> Branch
           </h2>
           <div class="table-container">
@@ -225,7 +252,7 @@
           </div>
 
           <!-- Recent Credit Sales Table -->
-          <h2 class="section-title" style="margin-top:40px;">
+          <h2 class="section-title" id="creditsSectionTitle" style="margin-top:40px;">
             Recent Credit Sales
           </h2>
           <div class="table-container">
@@ -249,7 +276,7 @@
           </div>
 
           <!-- Recent Cash Sales Table -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:15px;">
+          <div id="salesSectionTitle" style="display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:15px;">
             <h2 class="section-title" style="margin:0;border:none;padding:0;">
               Recent Sales
             </h2>

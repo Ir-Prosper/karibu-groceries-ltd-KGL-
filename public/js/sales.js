@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   populateTypeDropdowns();
   setupNavigation();
   setupSearch();
+  setupDashboardFilters();
   setupFormEventListeners();
   setupPriceCalculators();
   setupNotificationBell();
@@ -241,6 +242,8 @@ window.showSection = (name) => {
   document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
   const target = document.getElementById(name === 'dashboard' ? 'dashboardSection' : `${name}Section`);
   if (target) target.style.display = 'block';
+  const filtersBar = document.getElementById('dashboardFiltersBar');
+  if (filtersBar) filtersBar.style.display = name === 'dashboard' ? 'block' : 'none';
 
   const titleMap = {
     'dashboard':     'Sales Dashboard',
@@ -258,7 +261,10 @@ window.showSection = (name) => {
 function setupSearch() {
   const searchInput = document.getElementById('tableSearch');
   if (!searchInput) return;
-  searchInput.addEventListener('input', () => filterStockTable(searchInput.value.toLowerCase().trim()));
+  searchInput.addEventListener('input', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('sales');
+  });
 }
 
 function filterStockTable(term) {
@@ -270,6 +276,151 @@ function filterStockTable(term) {
     String(item.price_to_sell || 0).includes(term)
   );
   displayStockTable(filtered);
+}
+
+function setupDashboardFilters() {
+  const stockFilter = document.getElementById('stockStatusFilter');
+  const creditFilter = document.getElementById('creditStatusFilter');
+  const dateFilter = document.getElementById('salesDateFilter');
+  if (stockFilter) stockFilter.addEventListener('change', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('stock');
+  });
+  if (creditFilter) creditFilter.addEventListener('change', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('credits');
+  });
+  if (dateFilter) dateFilter.addEventListener('change', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('sales');
+  });
+
+  const resetBtn = document.getElementById('dashboardFilterReset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      const stockFilter = document.getElementById('stockStatusFilter');
+      const creditFilter = document.getElementById('creditStatusFilter');
+      const dateFilter = document.getElementById('salesDateFilter');
+      if (stockFilter) stockFilter.value = 'all';
+      if (creditFilter) creditFilter.value = 'all';
+      if (dateFilter) dateFilter.value = 'all';
+      const searchInput = document.getElementById('tableSearch');
+      if (searchInput) searchInput.value = '';
+      applyDashboardFilters();
+    });
+  }
+}
+
+function applyDashboardFilters() {
+  const searchInput = document.getElementById('tableSearch');
+  const query = (searchInput?.value || '').toLowerCase().trim();
+  const stockStatus = document.getElementById('stockStatusFilter')?.value || 'all';
+  const creditStatus = document.getElementById('creditStatusFilter')?.value || 'all';
+  const dateRange = document.getElementById('salesDateFilter')?.value || 'all';
+
+  const filteredStock = (availableStock || []).filter(item => {
+    if (!matchesStockStatus(item, stockStatus)) return false;
+    return matchesStockSearch(item, query);
+  });
+  displayStockTable(filteredStock);
+
+  const filteredCredits = (allCredits || []).filter(credit => {
+    if (!matchesCreditStatus(credit, creditStatus)) return false;
+    if (!matchesDateRange(credit.date_of_dispatch, dateRange)) return false;
+    return matchesCreditSearch(credit, query);
+  });
+  renderCreditsTable(filteredCredits);
+
+  const filteredSales = (allSales || []).filter(sale => {
+    if (!matchesDateRange(sale.date, dateRange)) return false;
+    return matchesSalesSearch(sale, query);
+  });
+  renderSalesTable(filteredSales);
+}
+
+function scrollToDashboardSection(type) {
+  const map = {
+    stock: 'stockSectionTitle',
+    credits: 'creditsSectionTitle',
+    sales: 'salesSectionTitle'
+  };
+  const targetId = map[type];
+  if (!targetId) return;
+  const target = document.getElementById(targetId);
+  const scroller = document.querySelector('.content-area');
+  if (!target || !scroller) return;
+  const top = target.offsetTop - 12;
+  scroller.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+}
+
+function matchesStockStatus(item, status) {
+  if (status === 'all') return true;
+  const qty = item?.remaining_kg ?? 0;
+  if (status === 'in') return qty > LOW_STOCK_THRESHOLD;
+  if (status === 'low') return qty > 0 && qty <= LOW_STOCK_THRESHOLD;
+  if (status === 'out') return qty <= 0;
+  return true;
+}
+
+function matchesCreditStatus(credit, status) {
+  if (status === 'all') return true;
+  return getCreditDisplayStatus(credit) === status;
+}
+
+function getCreditDisplayStatus(credit) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = credit?.due_date ? new Date(credit.due_date) : null;
+  if (due) due.setHours(0, 0, 0, 0);
+  const isOverdue = credit?.status !== 'paid' && due && due < today;
+  const wasPaidLate = credit?.status === 'paid' && due && due < today;
+
+  if (wasPaidLate) return 'paid';
+  if (credit?.status === 'paid') return 'paid';
+  if (isOverdue) return 'overdue';
+  if (credit?.status === 'partial') return 'partial';
+  return 'pending';
+}
+
+function matchesDateRange(dateValue, range) {
+  if (range === 'all') return true;
+  if (!dateValue) return false;
+  const value = new Date(dateValue);
+  if (Number.isNaN(value.getTime())) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  value.setHours(0, 0, 0, 0);
+
+  if (range === 'today') return value.getTime() === today.getTime();
+  const days = range === '7d' ? 7 : 30;
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  return value >= start && value <= today;
+}
+
+function matchesStockSearch(item, query) {
+  if (!query) return true;
+  return (
+    String(item?.name || '').toLowerCase().includes(query) ||
+    String(item?.type || '').toLowerCase().includes(query) ||
+    String(item?.remaining_kg || 0).includes(query) ||
+    String(item?.price_to_sell || 0).includes(query)
+  );
+}
+
+function matchesCreditSearch(credit, query) {
+  if (!query) return true;
+  return (
+    String(credit?.produce_name || '').toLowerCase().includes(query) ||
+    String(credit?.buyer_name || '').toLowerCase().includes(query) ||
+    String(credit?.national_id || '').toLowerCase().includes(query)
+  );
+}
+
+function matchesSalesSearch(sale, query) {
+  if (!query) return true;
+  return (
+    String(sale?.produce_name || '').toLowerCase().includes(query) ||
+    String(sale?.buyer_name || '').toLowerCase().includes(query)
+  );
 }
 
 // ======================================================================
@@ -309,13 +460,13 @@ async function loadAvailableStock(silent = false) {
     }
   }
 
-  displayStockTable(availableStock);
   populateProduceDropdowns(availableStock);
 
   const branchEl = document.getElementById('stockBranch');
   if (branchEl) branchEl.textContent = user?.branch || 'Branch';
 
   checkLowStockAndNotify();
+  applyDashboardFilters();
 }
 
 /**
@@ -490,25 +641,29 @@ async function loadRecentSales() {
     }
 
     allSales = sales;
-    const tbody  = document.getElementById('recentSalesBody');
-    if (!tbody) return;
-    const recent = sales.slice(0, 5);
-
-    if (recent.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="no-results">No recent sales</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = recent.map(s => `
-      <tr>
-        <td>${escHtml(s.produce_name || 'N/A')}</td>
-        <td>${(s.tonnage_kg || 0).toLocaleString()} kg</td>
-        <td>Ush ${(s.amount_paid_ugx || 0).toLocaleString()}</td>
-        <td>${escHtml(s.buyer_name || 'N/A')}</td>
-        <td>${s.date ? new Date(s.date).toLocaleDateString() : ''} ${s.time || ''}</td>
-      </tr>`).join('');
+    applyDashboardFilters();
 
   } catch (err) { console.error('[SALES] Load error:', err); }
+}
+
+function renderSalesTable(sales) {
+  const tbody = document.getElementById('recentSalesBody');
+  if (!tbody) return;
+
+  const recent = (sales || []).slice(0, 5);
+  if (recent.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="no-results">No recent sales</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = recent.map(s => `
+    <tr>
+      <td>${escHtml(s.produce_name || 'N/A')}</td>
+      <td>${(s.tonnage_kg || 0).toLocaleString()} kg</td>
+      <td>Ush ${(s.amount_paid_ugx || 0).toLocaleString()}</td>
+      <td>${escHtml(s.buyer_name || 'N/A')}</td>
+      <td>${s.date ? new Date(s.date).toLocaleDateString() : ''} ${s.time || ''}</td>
+    </tr>`).join('');
 }
 
 /**
@@ -533,7 +688,7 @@ async function loadCreditSales(silent = false) {
     }
 
     allCredits = credits;
-    renderCreditsTable(allCredits);
+    applyDashboardFilters();
 
   } catch (err) { console.error('[CREDITS] Load error:', err); }
 }

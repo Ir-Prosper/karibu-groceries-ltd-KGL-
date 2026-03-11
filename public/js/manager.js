@@ -97,6 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 2.6 Setup Search Functionality
   // --------------------------------------------------------------------
   setupSearch();
+  setupDashboardFilters();
   
   // --------------------------------------------------------------------
   // 2.7 Setup Procurement Form
@@ -254,6 +255,8 @@ function showSection(sectionId) {
   document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
   const section = document.getElementById(`${sectionId}Section`);
   if (section) section.style.display = 'block';
+  const filtersBar = document.getElementById('dashboardFiltersBar');
+  if (filtersBar) filtersBar.style.display = sectionId === 'dashboard' ? 'block' : 'none';
 }
 
 // ======================================================================
@@ -270,7 +273,8 @@ function setupSearch() {
   
   searchInput.addEventListener('input', e => {
     const query = e.target.value.toLowerCase().trim();
-    performSearch(query);
+    applyDashboardFilters(query);
+    scrollToDashboardSection('sales');
   });
 }
 
@@ -311,6 +315,150 @@ function performSearch(query) {
   renderSalesTable(filteredSales);
 }
 
+function setupDashboardFilters() {
+  const stockFilter = document.getElementById('stockStatusFilter');
+  const creditFilter = document.getElementById('creditStatusFilter');
+  const dateFilter = document.getElementById('salesDateFilter');
+  if (stockFilter) stockFilter.addEventListener('change', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('stock');
+  });
+  if (creditFilter) creditFilter.addEventListener('change', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('credits');
+  });
+  if (dateFilter) dateFilter.addEventListener('change', () => {
+    applyDashboardFilters();
+    scrollToDashboardSection('sales');
+  });
+
+  const resetBtn = document.getElementById('dashboardFilterReset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      const stockFilter = document.getElementById('stockStatusFilter');
+      const creditFilter = document.getElementById('creditStatusFilter');
+      const dateFilter = document.getElementById('salesDateFilter');
+      if (stockFilter) stockFilter.value = 'all';
+      if (creditFilter) creditFilter.value = 'all';
+      if (dateFilter) dateFilter.value = 'all';
+      const searchInput = document.getElementById('dashboardSearch');
+      if (searchInput) searchInput.value = '';
+      applyDashboardFilters();
+    });
+  }
+}
+
+function applyDashboardFilters(explicitQuery) {
+  const queryInput = document.getElementById('dashboardSearch');
+  const query = String(explicitQuery ?? queryInput?.value ?? '').toLowerCase().trim();
+  const stockStatus = document.getElementById('stockStatusFilter')?.value || 'all';
+  const creditStatus = document.getElementById('creditStatusFilter')?.value || 'all';
+  const dateRange = document.getElementById('salesDateFilter')?.value || 'all';
+
+  const filteredStock = (availableStock || []).filter(item => {
+    if (!matchesStockStatus(item, stockStatus)) return false;
+    return matchesStockSearch(item, query);
+  });
+  displayStockTable(filteredStock);
+
+  const filteredCredits = (allCredits || []).filter(credit => {
+    if (!matchesCreditStatus(credit, creditStatus)) return false;
+    if (!matchesDateRange(credit.date_of_dispatch, dateRange)) return false;
+    return matchesCreditSearch(credit, query);
+  });
+  renderCreditsTable(filteredCredits);
+
+  const filteredSales = (allSales || []).filter(sale => {
+    if (!matchesDateRange(sale.date, dateRange)) return false;
+    return matchesSalesSearch(sale, query);
+  });
+  renderSalesTable(filteredSales.slice(0, 10));
+}
+
+function scrollToDashboardSection(type) {
+  const map = {
+    stock: 'stockSectionTitle',
+    credits: 'creditsSectionTitle',
+    sales: 'salesSectionTitle'
+  };
+  const targetId = map[type];
+  if (!targetId) return;
+  const target = document.getElementById(targetId);
+  const scroller = document.querySelector('.content-area');
+  if (!target || !scroller) return;
+  const top = target.offsetTop - 12;
+  scroller.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+}
+
+function matchesStockStatus(item, status) {
+  if (status === 'all') return true;
+  const qty = item?.remaining_kg ?? 0;
+  if (status === 'in') return qty > LOW_STOCK_THRESHOLD;
+  if (status === 'low') return qty > 0 && qty <= LOW_STOCK_THRESHOLD;
+  if (status === 'out') return qty <= 0;
+  return true;
+}
+
+function matchesCreditStatus(credit, status) {
+  if (status === 'all') return true;
+  return getCreditDisplayStatus(credit) === status;
+}
+
+function getCreditDisplayStatus(credit) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = credit?.due_date ? new Date(credit.due_date) : null;
+  if (due) due.setHours(0, 0, 0, 0);
+  const isOverdue = credit?.status !== 'paid' && due && due < today;
+  const wasPaidLate = credit?.status === 'paid' && due && due < today;
+
+  if (wasPaidLate) return 'paid';
+  if (credit?.status === 'paid') return 'paid';
+  if (isOverdue) return 'overdue';
+  if (credit?.status === 'partial') return 'partial';
+  return 'pending';
+}
+
+function matchesDateRange(dateValue, range) {
+  if (range === 'all') return true;
+  if (!dateValue) return false;
+  const value = new Date(dateValue);
+  if (Number.isNaN(value.getTime())) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  value.setHours(0, 0, 0, 0);
+
+  if (range === 'today') return value.getTime() === today.getTime();
+  const days = range === '7d' ? 7 : 30;
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  return value >= start && value <= today;
+}
+
+function matchesStockSearch(item, query) {
+  if (!query) return true;
+  return (
+    String(item?.name || '').toLowerCase().includes(query) ||
+    String(item?.type || '').toLowerCase().includes(query)
+  );
+}
+
+function matchesCreditSearch(credit, query) {
+  if (!query) return true;
+  return (
+    String(credit?.produce_name || '').toLowerCase().includes(query) ||
+    String(credit?.buyer_name || '').toLowerCase().includes(query) ||
+    String(credit?.national_id || '').toLowerCase().includes(query)
+  );
+}
+
+function matchesSalesSearch(sale, query) {
+  if (!query) return true;
+  return (
+    String(sale?.produce_name || '').toLowerCase().includes(query) ||
+    String(sale?.buyer_name || '').toLowerCase().includes(query) ||
+    String(sale?.sales_agent || '').toLowerCase().includes(query)
+  );
+}
+
 // ======================================================================
 // SECTION 6: DATA LOADERS
 // ======================================================================
@@ -330,6 +478,7 @@ async function loadAvailableStock(silent = false) {
       populateSaleProduceDropdown(availableStock);
       populateCreditProduceDropdown(availableStock);
       checkLowStockAndNotify();
+      applyDashboardFilters();
     }
   } catch (err) {
     console.error('[MANAGER] Stock load error:', err);
@@ -345,7 +494,7 @@ async function loadBranchSales() {
     if (res.ok) {
       allSales = await res.json();
       console.log(`[MANAGER] Loaded ${allSales.length} sales`);
-      renderSalesTable(allSales.slice(0, 10)); // Show last 10
+      applyDashboardFilters();
     }
   } catch (err) {
     console.error('[MANAGER] Sales load error:', err);
@@ -361,7 +510,7 @@ async function loadCreditSales() {
     if (res.ok) {
       allCredits = await res.json();
       console.log(`[MANAGER] Loaded ${allCredits.length} credits`);
-      renderCreditsTable(allCredits);
+      applyDashboardFilters();
     }
   } catch (err) {
     console.error('[MANAGER] Credits load error:', err);

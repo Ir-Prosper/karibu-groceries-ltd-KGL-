@@ -18,12 +18,170 @@ function hasUnsafeHtmlChars(value) {
   return UNSAFE_HTML_PATTERN.test(String(value || ''));
 }
 
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function clampNumber(value, min, max) {
+  if (Number.isNaN(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+async function buildUserSummary() {
+  const [roleGroups, statusGroups, branchGroups] = await Promise.all([
+    User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }]),
+    User.aggregate([
+      {
+        $group: {
+          _id: { $ifNull: ['$status', 'active'] },
+          count: { $sum: 1 }
+        }
+      }
+    ]),
+    User.aggregate([
+      { $match: { role: { $ne: 'director' } } },
+      {
+        $group: {
+          _id: '$branch',
+          total: { $sum: 1 },
+          active: {
+            $sum: {
+              $cond: [
+                { $eq: [{ $ifNull: ['$status', 'active'] }, 'active'] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ])
+  ]);
+
+  const byRole = roleGroups.reduce((acc, item) => {
+    acc[item._id || 'unknown'] = item.count;
+    return acc;
+  }, {});
+
+  const byStatus = statusGroups.reduce((acc, item) => {
+    acc[item._id || 'active'] = item.count;
+    return acc;
+  }, {});
+
+  const byBranch = branchGroups.reduce((acc, item) => {
+    const key = item._id || 'Unassigned';
+    acc[key] = {
+      total: item.total || 0,
+      active: item.active || 0
+    };
+    return acc;
+  }, {});
+
+  const total = Object.values(byRole).reduce((sum, count) => sum + count, 0);
+  const active = byStatus.active || 0;
+
+  return {
+    total,
+    active,
+    byRole,
+    byStatus,
+    byBranch
+  };
+}
+
 router.get('/', verifyToken, allowRoles('director'), async (req, res) => {
   try {
-    const users = await User.find().select('-password_hash').sort({ created_at: -1 });
-    return res.json(users);
+    const page = clampNumber(parseInt(req.query.page, 10) || 1, 1, 100000);
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = Number.isNaN(rawLimit) ? 10 : rawLimit;
+
+    const query = {};
+    const search = String(req.query.q || '').trim();
+    const roleParam = String(req.query.role || '').trim().toLowerCase();
+    const branchParam = String(req.query.branch || '').trim();
+    const statusParam = String(req.query.status || '').trim().toLowerCase();
+
+    if (search) {
+      const matcher = new RegExp(escapeRegex(search), 'i');
+      query.$or = [
+        { full_name: matcher },
+        { email: matcher },
+        { branch: matcher }
+      ];
+    }
+
+    if (roleParam) {
+      const normalizedRole = roleParam === 'agent' ? 'sales_agent' : roleParam;
+      query.role = normalizedRole;
+    }
+
+    if (branchParam) {
+      query.branch = branchParam;
+    }
+
+    if (statusParam) {
+      query.status = statusParam;
+    }
+
+    if (limit === 0) {
+      const users = await User.find(query)
+        .select('-password_hash')
+        .sort({ created_at: -1 });
+      const response = {
+        users,
+        total: users.length,
+        page: 1,
+        pages: 1
+      };
+      const summaryRequested = ['1', 'true', 'yes'].includes(
+        String(req.query.summary || '').toLowerCase()
+      );
+      if (summaryRequested) {
+        response.summary = await buildUserSummary();
+      }
+      return res.json(response);
+    }
+
+    const safeLimit = clampNumber(limit, 1, 200);
+    const skip = (page - 1) * safeLimit;
+    const users = await User.find(query)
+      .select('-password_hash')
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(safeLimit);
+
+    const totalUsers = await User.countDocuments(query);
+    const summaryRequested = ['1', 'true', 'yes'].includes(
+      String(req.query.summary || '').toLowerCase()
+    );
+
+    const response = {
+      users,
+      total: totalUsers,
+      page,
+      pages: Math.ceil(totalUsers / safeLimit)
+    };
+
+    if (summaryRequested) {
+      response.summary = await buildUserSummary();
+    }
+
+    return res.json(response);
   } catch (err) {
     console.error('[USERS GET]', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id', verifyToken, allowRoles('director'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password_hash');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json(user);
+  } catch (err) {
+    console.error('[USERS GET ONE]', err);
     return res.status(500).json({ error: err.message });
   }
 });
